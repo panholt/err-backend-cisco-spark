@@ -192,6 +192,13 @@ class SparkRoom(Room):
     def title(self):
         return self._title
 
+    @title.setter
+    def title(self, value):
+        resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
+                            headers=HEADERS, json={'title': value})
+        self._title = value
+        return
+
     @property
     def isLocked(self):
         return self._isLocked
@@ -211,6 +218,17 @@ class SparkRoom(Room):
     @property
     def teamId(self):
         return self._teamId
+
+    @property
+    def topic(self):
+        return self._title
+
+    @topic.setter
+    def topic(self, value):
+        self.title = value
+        return
+
+    
 
     @property
     def occupants(self):

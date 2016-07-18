@@ -158,13 +158,17 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
     def room(self):
         return self._room
 
+    def leave_room(self):
+        resp = requests.delete(API_BASE + 'memberships/{}'.format(self.membershipId), headers=HEADERS)
+        return resp
+
 
 class SparkRoom(Room):
     '''
     This class represents a Spark room
     '''
     def __init__(self,
-                 idd,
+                 roomId,
                  title,
                  room_type,
                  isLocked,
@@ -172,7 +176,7 @@ class SparkRoom(Room):
                  created,
                  teamId=None):
 
-        self._idd = idd
+        self._roomId = roomId
         self._title = title
         self._room_type = room_type
         self._isLocked = isLocked
@@ -181,8 +185,8 @@ class SparkRoom(Room):
         self._teamId = teamId
 
     @property
-    def idd(self):
-        return self._idd
+    def roomId(self):
+        return self._roomId
 
     @property
     def title(self):
@@ -211,7 +215,7 @@ class SparkRoom(Room):
     @property
     def occupants(self):
         _occupants = []
-        resp = requests.get('https://api.ciscospark.com/v1/memberships', params={'roomId': self.idd}, headers=HEADERS)
+        resp = requests.get('https://api.ciscospark.com/v1/memberships', params={'roomId': self.roomId}, headers=HEADERS)
         data = resp.json().get('items', [])
 
         #Use weblinks to fetch all pages of the pagninated response
@@ -237,7 +241,7 @@ class SparkRoom(Room):
             log.debug('Requested to add someone to a locked room. Checking if I am moderator')
             if not any(( (member.personId == self.bot_identifier and member.isModerator) for member in self.occupants)):
                 raise Exception('Cannot add user to a moderated room if I am not the moderator')
-        data = {'roomId': self.idd}
+        data = {'roomId': self.roomId}
         if person.startswith(PERSON_PREFIX):
             data['personId'] = person
         elif '@' in person:
@@ -251,20 +255,20 @@ class SparkRoom(Room):
         pass
 
     def destroy(self):
-        resp = requests.delete(API_BASE + 'rooms/{}'.format(self.idd), headers=HEADERS)
+        resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId), headers=HEADERS)
         return
 
     def join(self):
         pass
 
     def __eq__(self, other):
-        return self.idd == other
+        return self.roomId == other
 
     def __hash__(self):
-        return hash(self.idd)
+        return hash(self.roomId)
 
     def __unicode__(self):
-        return self.idd
+        return self.roomId
 
     __str__ = __unicode__
 
@@ -338,14 +342,14 @@ class SparkBackend(ErrBot):
         return 'spark'
 
     def query_room(self, room_id):
-        room = [room for room in self._rooms if room.idd == room_id]
+        room = [room for room in self._rooms if room.roomId == room_id]
         if room:
             return room.pop()
         else:
             resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.format(room_id), headers=HEADERS)
             data = resp.json()
             log.debug('Got response with payload: {}'.format(data))
-            room = SparkRoom(idd=data['id'],
+            room = SparkRoom(roomId=data['id'],
                              title=data['title'],
                              room_type=data['type'],
                              isLocked=data['isLocked'],
@@ -411,9 +415,9 @@ class SparkBackend(ErrBot):
         message.frm = self.build_identifier(data.get('personId'), room_id=data.get('roomId'))
         room = self.query_room(data.get('roomId'))
         if room.room_type == 'group':
-            message.to = self.build_identifier(room.idd)
+            message.to = self.build_identifier(room.roomId)
         elif room.room_type == 'direct':
-            message.to = self.build_identifier(self.bot_identifier.personId, room_id=room.idd)
+            message.to = self.build_identifier(self.bot_identifier.personId, room_id=room.roomId)
         log.debug('Build identifier: {}'.format(type(message.frm)))
         return message
 
@@ -434,7 +438,7 @@ class SparkBackend(ErrBot):
                                                                                                resp.text))
             rooms = []
             for room in data.get('items', []):
-                rooms.append(SparkRoom(idd=room['id'],
+                rooms.append(SparkRoom(roomId=room['id'],
                                        title=room['title'],
                                        room_type=room['type'],
                                        isLocked=room['isLocked'],

@@ -11,8 +11,9 @@ class SparkWebhook(BotPlugin):
         self.log.debug('Got Request: {}'.format(request))
 
         handlers = {'messages': self.process_message,
-                    'memberships': self.process_membership}
-        handlers[request['resource']](request)
+                    'memberships': self.process_membership,
+                    'room': self.process_room}
+        handlers.get(request.get('resource'), self.process_unknown)(request)
         return "OK"
 
     def process_message(self, request):
@@ -39,4 +40,14 @@ class SparkWebhook(BotPlugin):
             else:
                 #TODO see above
                 pass
+        return
+
+    def process_room(self, request):
+        #Probably the least interesting of the events. This indicates a title change, or moderation change.
+        #Just refresh the bots rooms
+        self._bot._rooms = self._bot.rooms()
+        return
+
+    def process_unknown(self, request):
+        self.log.debug('Got unknown request: {}'.format(request))
         return

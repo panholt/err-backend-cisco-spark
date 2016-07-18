@@ -12,7 +12,7 @@ class SparkWebhook(BotPlugin):
 
         handlers = {'messages': self.process_message,
                     'memberships': self.process_membership,
-                    'room': self.process_room}
+                    'rooms': self.process_room}
         handlers.get(request.get('resource'), self.process_unknown)(request)
         return "OK"
 

@@ -35,8 +35,10 @@ BOT_IDENTITY = {
 ```
 
 The BOT_ADMINS key takes the personId string from Cisco Spark
+```
 BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS8yZTM3YjNkMi0zZTI0LTRlNTgtYWVkYi1kMjgzZWM1NGY2Mjc',    #PersonId of bot admins
-             )
+          )
+```
 
 ## Webserver configuration
 The Cisco Spark backend will not work properly without first configuring the errbot Webserver plugin. To do so, first start errbot in the text backend and supply the proper configuration:

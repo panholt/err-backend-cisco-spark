@@ -170,7 +170,7 @@ class SparkRoom(Room):
     def __init__(self,
                  roomId,
                  title,
-                 room_type,
+                 roomType,
                  isLocked,
                  lastActivity,
                  created,
@@ -178,7 +178,7 @@ class SparkRoom(Room):
 
         self._roomId = roomId
         self._title = title
-        self._room_type = room_type
+        self._roomType = roomType
         self._isLocked = isLocked
         self._lastActivity = lastActivity
         self._created = created
@@ -201,8 +201,8 @@ class SparkRoom(Room):
         return self._lastActivity
 
     @property
-    def room_type(self):
-        return self._room_type
+    def roomType(self):
+        return self._roomType
 
     @property
     def created(self):
@@ -235,7 +235,7 @@ class SparkRoom(Room):
         return _occupants
 
     def invite(self, person):
-        if self.room_type == 'direct':
+        if self.roomType == 'direct':
             raise Exception('Cannot add a person to a 1:1 room')
         if self.isLocked:
             log.debug('Requested to add someone to a locked room. Checking if I am moderator')
@@ -351,7 +351,7 @@ class SparkBackend(ErrBot):
             log.debug('Got response with payload: {}'.format(data))
             room = SparkRoom(roomId=data['id'],
                              title=data['title'],
-                             room_type=data['type'],
+                             roomType=data['type'],
                              isLocked=data['isLocked'],
                              lastActivity=data['lastActivity'],
                              created=data['created'],
@@ -414,9 +414,9 @@ class SparkBackend(ErrBot):
         message = Message(text)
         message.frm = self.build_identifier(data.get('personId'), room_id=data.get('roomId'))
         room = self.query_room(data.get('roomId'))
-        if room.room_type == 'group':
+        if room.roomType == 'group':
             message.to = self.build_identifier(room.roomId)
-        elif room.room_type == 'direct':
+        elif room.roomType == 'direct':
             message.to = self.build_identifier(self.bot_identifier.personId, room_id=room.roomId)
         log.debug('Build identifier: {}'.format(type(message.frm)))
         return message
@@ -440,7 +440,7 @@ class SparkBackend(ErrBot):
             for room in data.get('items', []):
                 rooms.append(SparkRoom(roomId=room['id'],
                                        title=room['title'],
-                                       room_type=room['type'],
+                                       roomType=room['type'],
                                        isLocked=room['isLocked'],
                                        lastActivity=room['lastActivity'],
                                        created=room['created'],

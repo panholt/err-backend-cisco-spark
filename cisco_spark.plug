@@ -1,0 +1,6 @@
+[Core]
+Name = Cisco Spark
+Module = cisco_spark
+
+[Documentation]
+Description = This is the Cisco Spark backend for Err.

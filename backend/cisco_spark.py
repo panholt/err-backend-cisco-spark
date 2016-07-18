@@ -194,10 +194,13 @@ class SparkRoom(Room):
 
     @title.setter
     def title(self, value):
-        resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
-                            headers=HEADERS, json={'title': value})
-        self._title = value
-        return
+        if self.roomType == 'direct':
+            raise ValueError('Cannot change the title of a direct room')
+        else:
+            resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
+                                headers=HEADERS, json={'title': value})
+            self._title = value
+            return
 
     @property
     def isLocked(self):
@@ -248,7 +251,8 @@ class SparkRoom(Room):
                                                 personDisplayName=membership['personDisplayName'],
                                                 isModerator=membership['isModerator'],
                                                 isMonitor=membership['isMonitor'],
-                                                created=membership['created'])
+                                                created=membership['created'],
+                                                membershipId=membership['id'])
                             )
         return _occupants
 
@@ -327,6 +331,10 @@ class SparkBackend(ErrBot):
     def webhook_url(self):
         return self._webhook_url
 
+    @property
+    def mode(self):
+        return 'spark'
+
     def get_webhooks(self):
         log.debug('Fetching Webhooks')
         resp = requests.get(API_BASE + 'webhooks', headers=HEADERS)
@@ -354,10 +362,6 @@ class SparkBackend(ErrBot):
         else:
             raise Exception('Invalid identifier')
         return
-
-    @property
-    def mode(self):
-        return 'spark'
 
     def query_room(self, room_id):
         room = [room for room in self._rooms if room.roomId == room_id]

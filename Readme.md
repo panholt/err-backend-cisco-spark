@@ -8,7 +8,7 @@ Python Requests
 ## Installation
 
 ```
-git checkout https://github.com/panholt/err-backend-cisco-spark.git
+git clone https://github.com/panholt/err-backend-cisco-spark.git
 ```
 
 ## Configuration:
@@ -60,8 +60,4 @@ The Cisco Spark Backend will automatically create the Webhooks using the Cisco S
 
 ## Contributing
 
-1. Fork it!
-2. Create your working branch: `git checkout -b some-new-feature`
-3. Commit your changes: `git commit -am 'Add some new feature'`
-4. Push to the branch: `git push origin some-new-feature`
-5. Submit a pull request 
+Pull requests welcome

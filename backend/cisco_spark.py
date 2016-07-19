@@ -273,6 +273,12 @@ class SparkRoom(Room):
         requests.post(API_BASE + 'memberships', json=data, headers=HEADERS)
         return
 
+    def create(self):
+        resp = requests.post(API_BASE + 'rooms', headers=HEADERS, json={'title': self.title})
+        data = resp.json()
+        self.roomId = data['id']
+        return
+
     def leave(self):
         pass
 
@@ -363,12 +369,12 @@ class SparkBackend(ErrBot):
             raise Exception('Invalid identifier')
         return
 
-    def query_room(self, room_id):
-        room = [room for room in self._rooms if room.roomId == room_id]
+    def query_room(self, room_text_rep):
+        room = [room for room in self._rooms if room.roomId == room_text_rep]
         if room:
             return room.pop()
-        else:
-            resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.format(room_id), headers=HEADERS)
+        elif room_text_rep.startswith(ROOM_PREFIX):
+            resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.format(room_text_rep), headers=HEADERS)
             data = resp.json()
             log.debug('Got response with payload: {}'.format(data))
             room = SparkRoom(roomId=data['id'],
@@ -380,6 +386,18 @@ class SparkBackend(ErrBot):
                              teamId=data.get('teamId') #May not exist
                              )
             self._rooms.add(room)
+            return room
+        #The core plugin for create room expects a room object back to call create on.. 
+        else:
+            room = SparkRoom(roomId=None,
+                             title=room_text_rep,
+                             roomType='group',
+                             isLocked=False,
+                             lastActivity=None,
+                             created=None,
+                             teamId=None
+                             )
+            #Don't append to rooms. Let the create method do that.
             return room
 
     def build_reply(self, message, text=None, direct=False):

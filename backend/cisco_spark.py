@@ -158,11 +158,7 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
 
     @property
     def room(self):
-        return self._room
-
-    def leave_room(self):
-        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS.get(self.roomId)), headers=HEADERS)
-        return resp
+        return self._room     
 
 
 class SparkRoom(Room):
@@ -289,7 +285,9 @@ class SparkRoom(Room):
         return
 
     def leave(self):
-        pass
+        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, MEMBERSHIPS.get('self.roomId')))
+        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS.get(self.roomId)), headers=HEADERS)
+        return resp
 
     def destroy(self):
         resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId), headers=HEADERS)

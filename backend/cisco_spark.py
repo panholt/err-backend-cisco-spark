@@ -19,6 +19,8 @@ API_BASE = 'https://api.ciscospark.com/v1/'
 HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
+MEMBERSHIPS = {} #Dict with roomId: membershipId key/values. 
+                 #Needed to implement room.leave()
 
 class SparkPerson(Person):
     '''
@@ -159,7 +161,7 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
         return self._room
 
     def leave_room(self):
-        resp = requests.delete(API_BASE + 'memberships/{}'.format(self.membershipId), headers=HEADERS)
+        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS.get(self.roomId)), headers=HEADERS)
         return resp
 
 
@@ -294,7 +296,7 @@ class SparkRoom(Room):
         return
 
     def join(self):
-        pass
+        raise NotImplemented('Cannot join rooms. Must be added instead')
 
     def __eq__(self, other):
         return self.roomId == other
@@ -331,6 +333,9 @@ class SparkBackend(ErrBot):
                      for hook in self.get_webhooks() )):
             log.debug('No Webhook found matching targetUrl: {}'.format(self.webhook_url))
             self.create_webhook()
+
+        #update memberships global
+        self.update_my_memberships()
 
     @property
     def display_name(self):
@@ -497,6 +502,12 @@ class SparkBackend(ErrBot):
             return rooms
         else:
             return []
+
+    def update_my_memberships(self):
+        resp = requests.get(API_BASE + 'memberships', headers=HEADERS)
+        for membership in resp.json():
+            MEMBERSHIPS[membership['roomId']] = membership['id']
+        return
 
     def serve_forever(self):
         log.debug('Entering serve forever')

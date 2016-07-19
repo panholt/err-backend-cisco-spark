@@ -504,6 +504,7 @@ class SparkBackend(ErrBot):
             return []
 
     def update_my_memberships(self):
+        global MEMBERSHIPS
         resp = requests.get(API_BASE + 'memberships', headers=HEADERS)
         for membership in resp.json():
             MEMBERSHIPS[membership['roomId']] = membership['id']

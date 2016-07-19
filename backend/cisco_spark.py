@@ -188,6 +188,13 @@ class SparkRoom(Room):
     def roomId(self):
         return self._roomId
 
+    @roomId.setter
+    def roomId(self, value):
+        if value.startswith(ROOM_PREFIX):
+            self._roomId = value
+        else:
+            raise ValueError('Invalid Room ID Provided')
+
     @property
     def title(self):
         return self._title

@@ -45,7 +45,7 @@ class SparkWebhook(BotPlugin):
     def process_room(self, request):
         #Probably the least interesting of the events. This indicates a title change, or moderation change.
         #Just refresh the bots rooms
-        self._bot._rooms = self._bot.rooms()
+        self._bot._rooms = set(self._bot.rooms())
         return
 
     def process_unknown(self, request):

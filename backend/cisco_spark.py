@@ -19,8 +19,11 @@ API_BASE = 'https://api.ciscospark.com/v1/'
 HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
+
+#Globals 
 MEMBERSHIPS = {} #Dict with roomId: membershipId key/values. 
                  #Needed to implement room.leave()
+MY_MODERATED_ROOMS = [] #Keep a list of rooms that are moderated by the bot
 
 class SparkPerson(Person):
     '''
@@ -201,6 +204,8 @@ class SparkRoom(Room):
     def title(self, value):
         if self.roomType == 'direct':
             raise ValueError('Cannot change the title of a direct room')
+        elif self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
+            raise AttributeError('Room is moderated by another party')
         else:
             resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
                                 headers=HEADERS, json={'title': value})
@@ -266,7 +271,7 @@ class SparkRoom(Room):
             raise Exception('Cannot add a person to a 1:1 room')
         if self.isLocked:
             log.debug('Requested to add someone to a locked room. Checking if I am moderator')
-            if not any(( (member.personId == self.bot_identifier and member.isModerator) for member in self.occupants)):
+            if self.roomId not in MY_MODERATED_ROOMS:
                 raise Exception('Cannot add user to a moderated room if I am not the moderator')
         data = {'roomId': self.roomId}
         if person.startswith(PERSON_PREFIX):
@@ -285,11 +290,15 @@ class SparkRoom(Room):
         return
 
     def leave(self):
+        if self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
+            raise AttributeError('Cannot Leave Moderated Room')
         log.debug('Leaving room: {} with membership: {}'.format(self.roomId, MEMBERSHIPS.get('self.roomId')))
         resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS.get(self.roomId)), headers=HEADERS)
         return resp
 
     def destroy(self):
+        if self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
+            raise AttributeError('Cannot Leave Moderated Room')
         resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId), headers=HEADERS)
         return
 
@@ -506,6 +515,8 @@ class SparkBackend(ErrBot):
         data = resp.json()
         for membership in data['items']:
             MEMBERSHIPS[membership['roomId']] = membership['id']
+            if membership['isModerator']:
+                MY_MODERATED_ROOMS.append(membership['roomId'])
         return
 
     def serve_forever(self):

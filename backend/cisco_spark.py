@@ -282,14 +282,15 @@ class SparkRoom(Room):
             data += resp.json().get('items', [])
 
         for membership in data:
-            _occupants.append(SparkRoomOccupant(room=self,
-                                                personId=membership['personId'],
-                                                personEmail=membership['personEmail'],
-                                                personDisplayName=membership['personDisplayName'],
-                                                isModerator=membership['isModerator'],
-                                                isMonitor=membership['isMonitor'],
-                                                created=membership['created'],
-                                                membershipId=membership['id'])
+            _occupants.append(SparkRoomOccupant(
+                              room=self,
+                              personId=membership['personId'],
+                              personEmail=membership['personEmail'],
+                              personDisplayName=membership['personDisplayName'],
+                              isModerator=membership['isModerator'],
+                              isMonitor=membership['isMonitor'],
+                              created=membership['created'],
+                              membershipId=membership['id'])
                             )
         return _occupants
 
@@ -363,7 +364,8 @@ class SparkRoomList(dict):
 
     def __missing__(self, key):
         if key.startswith(ROOM_PREFIX):
-            resp = requests.get(API_BASE + 'rooms/'.format(key), headers=HEADERS)
+            resp = requests.get(API_BASE + 'rooms/'.format(key),
+                                headers=HEADERS)
             if resp.status_code != 200:
                 process_api_error(resp)
 

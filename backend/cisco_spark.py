@@ -27,7 +27,7 @@ MEMBERSHIPS = SparkMemberships() #Dict with roomId: membershipId key/values.
 def process_api_error(resp):
     log.debug('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
     log.debug('Error details: {}'.format(resp.text))
-    raise Exception'(Recevied a: {} response from Cisco Spark'.format(resp.status_code))
+    raise Exception('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
 
 class SparkMemberships(dict):
     '''

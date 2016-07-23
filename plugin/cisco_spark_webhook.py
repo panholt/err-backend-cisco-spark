@@ -45,8 +45,9 @@ class SparkWebhook(BotPlugin):
         return
 
     def process_room(self, request):
-        #Probably the least interesting of the events. This indicates a title change, or moderation change.
-        pass
+        if request['event'] == 'created':
+            self._bot._rooms.add_from_json(request['data'])
+        return
 
     def process_unknown(self, request):
         self.log.debug('Got unknown request: {}'.format(request))

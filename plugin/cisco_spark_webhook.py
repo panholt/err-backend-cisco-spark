@@ -46,7 +46,7 @@ class SparkWebhook(BotPlugin):
 
     def process_room(self, request):
         if request['event'] == 'created':
-            self._bot._rooms.add_from_json(request['data'])
+            self._bot._rooms.get(request['data']['roomId'])
         return
 
     def process_unknown(self, request):

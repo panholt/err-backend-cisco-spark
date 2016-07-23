@@ -367,19 +367,16 @@ class SparkRoomList(dict):
             if resp.status_code != 200:
                 process_api_error(resp)
 
-            self.add_from_json(resp.json())
+            data = resp.json()
+            self[key] = SparkRoom(roomId=data['id'],
+                                  title=data['title'],
+                                  roomType=data['type'],
+                                  isLocked=data['isLocked'],
+                                  lastActivity=data['lastActivity'],
+                                  created=data['created'],
+                                  teamId=data.get('teamId') #May not exist
+                                  )
             return self[key]
-
-    def add_from_json(self, data):
-        self[data['id']] = SparkRoom(roomId=data['id'],
-                                     title=data['title'],
-                                     roomType=data['type'],
-                                     isLocked=data['isLocked'],
-                                     lastActivity=data['lastActivity'],
-                                     created=data['created'],
-                                     teamId=data.get('teamId') #May not exist
-                                     )
-
 
 class SparkBackend(ErrBot):
     '''

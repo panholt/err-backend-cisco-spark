@@ -361,9 +361,6 @@ class SparkRoomList(dict):
     subclassed dict to fetch missing rooms
     '''
 
-    def __init__(self, *args, **kwargs):
-        super()dict.__init__(*args, **kwargs)
-
     def __missing__(self, key):
         if key.startswith(ROOM_PREFIX)
             resp = requests.get(API_BASE + 'rooms/'.format(key), headers=HEADERS)

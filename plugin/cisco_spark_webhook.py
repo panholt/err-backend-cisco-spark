@@ -29,7 +29,7 @@ class SparkWebhook(BotPlugin):
         if request['event'] == 'deleted':
             if request['data']['personId'] == self._bot.bot_identifier:
                 self.log.debug('Removed from room: {}'.format(request['data']['roomId']))
-                if request['data']['roomId'] in self._bot._rooms.keys()
+                if request['data']['roomId'] in self._bot._rooms.keys():
                     del self._bot._rooms[request['data']['roomId']]
             else:
                 #TODO Not the bot, so don't really care until all the RoomOccupant stuff is implemented
@@ -38,7 +38,7 @@ class SparkWebhook(BotPlugin):
             if request['data']['personId'] == self._bot.bot_identifier:
                 self.log.debug('Added to room: {}'.format(request['data']['roomId']))
                 #Call get to create the room in the backend cache
-                self._bot._rooms.get(request['data']['roomId']) 
+                self._bot._rooms.get(request['data']['roomId'])
             else:
                 #TODO see above
                 pass

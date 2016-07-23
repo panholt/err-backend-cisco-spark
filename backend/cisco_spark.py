@@ -321,7 +321,7 @@ class SparkRoom(Room):
 
     def leave(self):
         log.debug('Leaving room: {} with membership: {}'.\
-                  format(self.roomId, get_membership_by_room(self.roomId))
+                  format(self.roomId, get_membership_by_room(self.roomId)))
 
         resp = requests.delete(API_BASE + 'memberships/{}'.\
                                format(get_membership_by_room(self.roomId)),

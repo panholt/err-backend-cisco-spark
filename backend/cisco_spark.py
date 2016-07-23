@@ -20,33 +20,22 @@ HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
 
-#Globals
-MEMBERSHIPS = SparkMemberships() #Dict with roomId: membershipId key/values.
-                                 #Needed to implement room.leave()
+def get_membership_by_room(roomId):
+    resp = requests.get(API_BASE + 'memberships',
+                        headers=HEADERS, params={'roomId': key})
+    if resp.status_code == 200:
+        try:
+            return resp.json()['id']
+        except:
+            log.debug('Error occured getting membership. Details: {}'.format(resp.text))
+    else:
+        process_api_error(resp)
+    return
 
 def process_api_error(resp):
     log.debug('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
     log.debug('Error details: {}'.format(resp.text))
     raise Exception('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
-
-class SparkMemberships(dict):
-    '''
-    Dict object that fetches missing values from Cisco Spark
-    '''
-    def __missing__(self, key):
-        resp = requests.get(API_BASE + 'memberships',
-                            headers=HEADERS, params={'roomId': key})
-        if resp.status_code == 200:
-            try:
-                self[key] = resp.json().get('id')
-                return self[key]
-            except:
-                log.debug('Error occured fetching membership. Details: {}'.\
-                          format(resp.text))
-                raise KeyError(key)
-        else:
-            process_api_error(resp)
-            raise KeyError(key)
 
 class SparkPerson(Person):
     '''
@@ -323,8 +312,8 @@ class SparkRoom(Room):
         return
 
     def leave(self):
-        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, MEMBERSHIPS[self.roomId]))
-        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS[self.roomId]), headers=HEADERS)
+        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, get_membership_by_room(self.roomId))
+        resp = requests.delete(API_BASE + 'memberships/{}'.format(get_membership_by_room(self.roomId), headers=HEADERS)
         if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
         elif resp.status_code != 204: #Member deleted
@@ -377,9 +366,6 @@ class SparkBackend(ErrBot):
                      for hook in self.get_webhooks() )):
             log.debug('No Webhook found matching targetUrl: {}'.format(self.webhook_url))
             self.create_webhook()
-
-        #update memberships global
-        self.update_my_memberships()
 
     @property
     def display_name(self):
@@ -548,13 +534,6 @@ class SparkBackend(ErrBot):
             return rooms
         else:
             return []
-
-    def update_my_memberships(self):
-        resp = requests.get(API_BASE + 'memberships', headers=HEADERS)
-        data = resp.json()
-        for membership in data['items']:
-            MEMBERSHIPS[membership['roomId']] = membership['id']
-        return
 
     def serve_forever(self):
         log.debug('Entering serve forever')

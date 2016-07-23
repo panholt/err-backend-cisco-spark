@@ -27,15 +27,18 @@ def get_membership_by_room(roomId):
         try:
             return resp.json()['id']
         except:
-            log.debug('Error occured getting membership. Details: {}'.format(resp.text))
+            log.debug('Error occured getting membership. Details: {}'.\
+                      format(resp.text))
     else:
         process_api_error(resp)
     return
 
 def process_api_error(resp):
-    log.debug('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
+    log.debug('Recevied a: {} response from Cisco Spark'.\
+              format(resp.status_code))
     log.debug('Error details: {}'.format(resp.text))
-    raise Exception('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
+    raise Exception('Recevied a: {} response from Cisco Spark'.\
+                     format(resp.status_code))
 
 class SparkPerson(Person):
     '''
@@ -56,7 +59,8 @@ class SparkPerson(Person):
         if personId is not None and not personId.startswith(PERSON_PREFIX):
             raise Exception('Invalid Spark Person ID: {}'.format(personId))
         elif personEmail is not None and '@' not in personEmail:
-            raise Exception('Invalid Spark Person Email address {}'.format(personEmail))
+            raise Exception('Invalid Spark Person Email address {}'.\
+                            format(personEmail))
 
         self._personId = personId
         self._personEmail = personEmail
@@ -299,21 +303,30 @@ class SparkRoom(Room):
             data['personEmail'] = person
         else:
             raise Exception('Invalid Identifier: {}. Must be an email address or Spark personId'.format(person))
-        resp = requests.post(API_BASE + 'memberships', json=data, headers=HEADERS)
+
+        resp = requests.post(API_BASE + 'memberships',
+                             json=data, headers=HEADERS)
         if resp.status_code == 409:
-            log.debug('Received 409 Response adding user to room. Body: {}'.format(resp.text))
+            log.debug('Received 409 Response adding user to room. Body: {}'.\
+                       format(resp.text))
             raise Exception('Unable to add user to room. Either room is locked, or user is already in room')
         return
 
     def create(self):
-        resp = requests.post(API_BASE + 'rooms', headers=HEADERS, json={'title': self.title})
+        resp = requests.post(API_BASE + 'rooms', headers=HEADERS,
+                             json={'title': self.title})
         data = resp.json()
         self.roomId = data['id']
         return
 
     def leave(self):
-        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, get_membership_by_room(self.roomId))
-        resp = requests.delete(API_BASE + 'memberships/{}'.format(get_membership_by_room(self.roomId), headers=HEADERS)
+        log.debug('Leaving room: {} with membership: {}'.\
+                  format(self.roomId, get_membership_by_room(self.roomId))
+
+        resp = requests.delete(API_BASE + 'memberships/{}'.\
+                               format(get_membership_by_room(self.roomId)),
+                               headers=HEADERS)
+
         if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
         elif resp.status_code != 204: #Member deleted
@@ -321,7 +334,8 @@ class SparkRoom(Room):
         return
 
     def destroy(self):
-        resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId), headers=HEADERS)
+        resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId),
+                               headers=HEADERS)
         if resp.status_code == 409:
             raise Exception('Unable to delete moderated room')
         elif resp.status_code != 204: #Member deleted
@@ -364,7 +378,8 @@ class SparkBackend(ErrBot):
 
         if not any(( hook['targetUrl'] == self.webhook_url
                      for hook in self.get_webhooks() )):
-            log.debug('No Webhook found matching targetUrl: {}'.format(self.webhook_url))
+            log.debug('No Webhook found matching targetUrl: {}'.\
+                       format(self.webhook_url))
             self.create_webhook()
 
     @property
@@ -418,7 +433,8 @@ class SparkBackend(ErrBot):
         if room:
             return room.pop()
         elif room_text_rep.startswith(ROOM_PREFIX):
-            resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.format(room_text_rep), headers=HEADERS)
+            resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.\
+                                 format(room_text_rep), headers=HEADERS)
             data = resp.json()
             log.debug('Got response with payload: {}'.format(data))
             room = SparkRoom(roomId=data['id'],
@@ -471,9 +487,8 @@ class SparkBackend(ErrBot):
         if resp.status_code == 200:
             return
         else:
-            raise Exception('Recevied a {} from {} with body {}'.format(resp.status_code,
-                                                                        resp.request.url,
-                                                                        resp.request.body))
+            raise Exception('Recevied a {} from {} with body {}'.\
+                             format(resp.status_code, resp.request.url, resp.request.body))
 
     def change_presence(self, status, message):
         log.debug('Presence is not implemented by the Spark backend')
@@ -487,22 +502,30 @@ class SparkBackend(ErrBot):
             An instance of :class:`~Message`.
         """
 
-        resp = requests.get(API_BASE + 'messages/{}'.format(message_id), headers=HEADERS)
+        resp = requests.get(API_BASE + 'messages/{}'.\
+                            format(message_id), headers=HEADERS)
+        if resp.status_code != 200:
+            process_api_error(resp)
+
         data = resp.json()
         text = data.get('text', '')
+
         log.debug('Text before substitution: {}'.format(text))
         log.debug('Display name is: {}'.format(self.display_name))
         if text.startswith(self.display_name):
             text = text.replace(self.display_name + ' ', '', 1)
         log.debug('Text after substituion: {}'.format(text))
+
         message = Message(text)
-        message.frm = self.build_identifier(data.get('personId'), room_id=data.get('roomId'))
+        message.frm = self.build_identifier(data.get('personId'),
+                                            room_id=data.get('roomId'))
         room = self.query_room(data.get('roomId'))
+
         if room.roomType == 'group':
             message.to = self.build_identifier(room.roomId)
         elif room.roomType == 'direct':
-            message.to = self.build_identifier(self.bot_identifier.personId, room_id=room.roomId)
-        log.debug('Build identifier: {}'.format(type(message.frm)))
+            message.to = self.build_identifier(self.bot_identifier.personId,
+                                               room_id=room.roomId)
         return message
 
     def rooms(self):
@@ -518,8 +541,8 @@ class SparkBackend(ErrBot):
             try:
                 data = resp.json()
             except ValueError:
-                log.debug('Failed to decode response with status code: {} and body: {}'.format(resp.status_code,
-                                                                                               resp.text))
+                log.debug('Failed to decode response with status code: {} and body: {}'\
+                           .format(resp.status_code, resp.text))
             rooms = []
             for room in data.get('items', []):
                 rooms.append(SparkRoom(roomId=room['id'],

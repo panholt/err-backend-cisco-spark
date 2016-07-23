@@ -29,14 +29,16 @@ class SparkWebhook(BotPlugin):
         if request['event'] == 'deleted':
             if request['data']['personId'] == self._bot.bot_identifier:
                 self.log.debug('Removed from room: {}'.format(request['data']['roomId']))
-                self._bot._rooms.discard(self._bot.query_room(request['data']['roomId']))
+                if request['data']['roomId'] in self._bot._rooms.keys()
+                    del self._bot._rooms[request['data']['roomId']]
             else:
                 #TODO Not the bot, so don't really care until all the RoomOccupant stuff is implemented
                 pass
         elif request['event'] == 'created':
             if request['data']['personId'] == self._bot.bot_identifier:
                 self.log.debug('Added to room: {}'.format(request['data']['roomId']))
-                self._bot._rooms.add(self._bot.query_room(request['data']['roomId']))
+                #Call get to create the room in the backend cache
+                self._bot._rooms.get(request['data']['roomId']) 
             else:
                 #TODO see above
                 pass
@@ -44,9 +46,7 @@ class SparkWebhook(BotPlugin):
 
     def process_room(self, request):
         #Probably the least interesting of the events. This indicates a title change, or moderation change.
-        #Just refresh the bots rooms
-        self._bot._rooms = set(self._bot.rooms())
-        return
+        pass
 
     def process_unknown(self, request):
         self.log.debug('Got unknown request: {}'.format(request))

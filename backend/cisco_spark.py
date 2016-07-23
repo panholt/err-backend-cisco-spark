@@ -324,7 +324,7 @@ class SparkRoom(Room):
                   format(self.roomId, get_membership_by_room(self.roomId))
 
         resp = requests.delete(API_BASE + 'memberships/{}'.\
-                               format(get_membership_by_room(self.roomId)),
+                               format(get_membership_by_room(self.roomId),
                                headers=HEADERS)
 
         if resp.status_code == 409:

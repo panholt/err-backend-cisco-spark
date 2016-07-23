@@ -362,7 +362,7 @@ class SparkRoomList(dict):
     '''
 
     def __missing__(self, key):
-        if key.startswith(ROOM_PREFIX)
+        if key.startswith(ROOM_PREFIX):
             resp = requests.get(API_BASE + 'rooms/'.format(key), headers=HEADERS)
             if resp.status_code != 200:
                 process_api_error(resp)

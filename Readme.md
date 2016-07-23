@@ -1,5 +1,5 @@
 
-This is an errbot (http://errbot.net) backend for Cisco Spark (https://www.ciscospark.com/) 
+This is an errbot (http://errbot.net) backend for Cisco Spark (https://www.ciscospark.com/)
 
 ## Requirements
 Python Requests
@@ -36,7 +36,7 @@ BOT_IDENTITY = {
 
 The BOT_ADMINS key takes the personId string from Cisco Spark
 ```
-BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS8yZTM3YjNkMi0zZTI0LTRlNTgtYWVkYi1kMjgzZWM1NGY2Mjc',    #PersonId of bot admins
+BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS...',    #PersonId of bot admins
           )
 ```
 
@@ -48,7 +48,7 @@ $ errbot -T
 >>> /plugin config Webserver {'HOST': '0.0.0.0', 'PORT': 80,  'SSL': {'certificate': '', 'enabled': False, 'host': '0.0.0.0', 'key': '', 'port': 443}}
 ```
 
-Change the HTTP and HTTPS ports to suit your environment. 
+Change the HTTP and HTTPS ports to suit your environment.
 
 Next, add the WEBHOOK_URL key to errbot's config.py to the your webhook receiver URL:
 

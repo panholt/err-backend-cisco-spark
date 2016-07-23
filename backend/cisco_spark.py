@@ -20,10 +20,33 @@ HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
 
-#Globals 
-MEMBERSHIPS = {} #Dict with roomId: membershipId key/values. 
-                 #Needed to implement room.leave()
-MY_MODERATED_ROOMS = [] #Keep a list of rooms that are moderated by the bot
+#Globals
+MEMBERSHIPS = SparkMemberships() #Dict with roomId: membershipId key/values.
+                                 #Needed to implement room.leave()
+
+def process_api_error(resp):
+    log.debug('Recevied a: {} response from Cisco Spark'.format(resp.status_code))
+    log.debug('Error details: {}'.format(resp.text))
+    raise Exception'(Recevied a: {} response from Cisco Spark'.format(resp.status_code))
+
+class SparkMemberships(dict):
+    '''
+    Dict object that fetches missing values from Cisco Spark
+    '''
+    def __missing__(self, key):
+        resp = requests.get(API_BASE + 'memberships',
+                            headers=HEADERS, params={'roomId': key})
+        if resp.status_code == 200:
+            try:
+                self[key] = resp.json().get('id')
+                return self[key]
+            except:
+                log.debug('Error occured fetching membership. Details: {}'.\
+                          format(resp.text))
+                raise KeyError(key)
+        else:
+            process_api_error(resp)
+            raise KeyError(key)
 
 class SparkPerson(Person):
     '''
@@ -161,7 +184,7 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
 
     @property
     def room(self):
-        return self._room     
+        return self._room
 
 
 class SparkRoom(Room):
@@ -204,13 +227,18 @@ class SparkRoom(Room):
     def title(self, value):
         if self.roomType == 'direct':
             raise ValueError('Cannot change the title of a direct room')
-        elif self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
-            raise AttributeError('Room is moderated by another party')
         else:
             resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
                                 headers=HEADERS, json={'title': value})
-            self._title = value
-            return
+            if resp.status_code == 200:
+                self._title = value
+                return
+            elif resp.status_code == 409:
+                #Policy response. Room is moderated
+                raise AttributeError('Cannot change the title of locked room')
+            else:
+                process_api_error(resp)
+                return
 
     @property
     def isLocked(self):
@@ -241,17 +269,23 @@ class SparkRoom(Room):
         self.title = value
         return
 
-    
+
 
     @property
     def occupants(self):
         _occupants = []
-        resp = requests.get('https://api.ciscospark.com/v1/memberships', params={'roomId': self.roomId}, headers=HEADERS)
+        resp = requests.get('https://api.ciscospark.com/v1/memberships',
+                             params={'roomId': self.roomId}, headers=HEADERS)
+        if resp.status_code != 200:
+            process_api_error(resp)
+
         data = resp.json().get('items', [])
 
         #Use weblinks to fetch all pages of the pagninated response
         while resp.links.get('next'):
             resp = requests.get(resp.links['next']['url'], headers=HEADERS)
+            if resp.status_code != 200:
+                process_api_error(resp)
             data += resp.json().get('items', [])
 
         for membership in data:
@@ -269,10 +303,6 @@ class SparkRoom(Room):
     def invite(self, person):
         if self.roomType == 'direct':
             raise Exception('Cannot add a person to a 1:1 room')
-        if self.isLocked:
-            log.debug('Requested to add someone to a locked room. Checking if I am moderator')
-            if self.roomId not in MY_MODERATED_ROOMS:
-                raise Exception('Cannot add user to a moderated room if I am not the moderator')
         data = {'roomId': self.roomId}
         if person.startswith(PERSON_PREFIX):
             data['personId'] = person
@@ -280,7 +310,10 @@ class SparkRoom(Room):
             data['personEmail'] = person
         else:
             raise Exception('Invalid Identifier: {}. Must be an email address or Spark personId'.format(person))
-        requests.post(API_BASE + 'memberships', json=data, headers=HEADERS)
+        resp = requests.post(API_BASE + 'memberships', json=data, headers=HEADERS)
+        if resp.status_code == 409:
+            log.debug('Received 409 Response adding user to room. Body: {}'.format(resp.text))
+            raise Exception('Unable to add user to room. Either room is locked, or user is already in room')
         return
 
     def create(self):
@@ -290,16 +323,20 @@ class SparkRoom(Room):
         return
 
     def leave(self):
-        if self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
-            raise AttributeError('Cannot Leave Moderated Room')
-        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, MEMBERSHIPS.get('self.roomId')))
-        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS.get(self.roomId)), headers=HEADERS)
-        return resp
+        log.debug('Leaving room: {} with membership: {}'.format(self.roomId, MEMBERSHIPS[self.roomId]))
+        resp = requests.delete(API_BASE + 'memberships/{}'.format(MEMBERSHIPS[self.roomId]), headers=HEADERS)
+        if resp.status_code == 409:
+            raise Exception('Unable to leave moderated room')
+        elif resp.status_code != 204: #Member deleted
+            process_api_error(resp)
+        return
 
     def destroy(self):
-        if self.isLocked and self.roomId not in MY_MODERATED_ROOMS:
-            raise AttributeError('Cannot Leave Moderated Room')
         resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId), headers=HEADERS)
+        if resp.status_code == 409:
+            raise Exception('Unable to delete moderated room')
+        elif resp.status_code != 204: #Member deleted
+            process_api_error(resp)
         return
 
     def join(self):
@@ -363,6 +400,8 @@ class SparkBackend(ErrBot):
     def get_webhooks(self):
         log.debug('Fetching Webhooks')
         resp = requests.get(API_BASE + 'webhooks', headers=HEADERS)
+        if resp.status_code != 200:
+            process_api_error(resp)
         data = resp.json()
         return data['items']
 
@@ -406,7 +445,7 @@ class SparkBackend(ErrBot):
                              )
             self._rooms.add(room)
             return room
-        #The core plugin for create room expects a room object back to call create on.. 
+        #The core plugin for create room expects a room object back to call create on..
         else:
             room = SparkRoom(roomId=None,
                              title=room_text_rep,
@@ -515,8 +554,6 @@ class SparkBackend(ErrBot):
         data = resp.json()
         for membership in data['items']:
             MEMBERSHIPS[membership['roomId']] = membership['id']
-            if membership['isModerator']:
-                MY_MODERATED_ROOMS.append(membership['roomId'])
         return
 
     def serve_forever(self):

@@ -370,7 +370,7 @@ class SparkRoomList(dict):
             self.add_from_json(resp.json())
             return self[key]
 
-    def add_from_json(data):
+    def add_from_json(self, data):
         self[data['id']] = SparkRoom(roomId=data['id'],
                                      title=data['title'],
                                      roomType=data['type'],

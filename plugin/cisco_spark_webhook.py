@@ -58,3 +58,18 @@ class SparkWebhook(BotPlugin):
     def process_unknown(self, request):
         self.log.debug('Got unknown request: {}'.format(request))
         return
+
+    @botcmd
+    def room_list(self, message, args):
+        """
+        List chatrooms the bot has joined.
+        Usage:
+        /room list
+        Examples:
+        /room list
+        """
+        rooms = [room.title for room in self.rooms()]
+        if len(rooms):
+            return "I'm currently in these rooms:\n\t{}".format("\n\t".join(rooms))
+        else:
+            return "I'm not currently in any rooms."

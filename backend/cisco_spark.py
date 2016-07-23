@@ -356,6 +356,32 @@ class SparkRoom(Room):
 
     __str__ = __unicode__
 
+class SparkRoomList(dict):
+    '''
+    subclassed dict to fetch missing rooms
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super()dict.__init__(*args, **kwargs)
+
+    def __missing__(self, key):
+        if key.startswith(ROOM_PREFIX)
+            resp = requests.get(API_BASE + 'rooms/'.format(key), headers=HEADERS)
+            if resp.status_code != 200:
+                process_api_error(resp)
+
+            data = resp.json()
+            self[key] = SparkRoom(roomId=data['id'],
+                                  title=data['title'],
+                                  roomType=data['type'],
+                                  isLocked=data['isLocked'],
+                                  lastActivity=data['lastActivity'],
+                                  created=data['created'],
+                                  teamId=data.get('teamId') #May not exist
+                                  )
+            return self[key]
+
+
 class SparkBackend(ErrBot):
     '''
     The Spark backend for ErrBot
@@ -374,7 +400,7 @@ class SparkBackend(ErrBot):
         self._display_name = identity['email'].split('@')[0]
         self._email = identity['email']
         self._webhook_url = config.WEBHOOK_URL
-        self._rooms = set(self.rooms())
+        self._rooms = SparkRoomList([(room.roomId, room) for room in self.rooms()])
 
         if not any(( hook['targetUrl'] == self.webhook_url
                      for hook in self.get_webhooks() )):
@@ -429,24 +455,8 @@ class SparkBackend(ErrBot):
         return
 
     def query_room(self, room_text_rep):
-        room = [room for room in self._rooms if room.roomId == room_text_rep]
-        if room:
-            return room.pop()
-        elif room_text_rep.startswith(ROOM_PREFIX):
-            resp = requests.get('https://api.ciscospark.com/v1/rooms/{}'.\
-                                 format(room_text_rep), headers=HEADERS)
-            data = resp.json()
-            log.debug('Got response with payload: {}'.format(data))
-            room = SparkRoom(roomId=data['id'],
-                             title=data['title'],
-                             roomType=data['type'],
-                             isLocked=data['isLocked'],
-                             lastActivity=data['lastActivity'],
-                             created=data['created'],
-                             teamId=data.get('teamId') #May not exist
-                             )
-            self._rooms.add(room)
-            return room
+        if room_text_rep.startswith(ROOM_PREFIX):
+            return self._rooms[room_text_rep]
         #The core plugin for create room expects a room object back to call create on..
         else:
             room = SparkRoom(roomId=None,

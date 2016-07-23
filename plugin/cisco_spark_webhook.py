@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from errbot import BotPlugin, botcmd, arg_botcmd, webhook
 
 

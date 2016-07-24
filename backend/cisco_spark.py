@@ -567,7 +567,8 @@ class SparkBackend(ErrBot):
                                        teamId=room.get('teamId')
                                        ))
             # Refresh the room cache
-            self._rooms = SparkRoomList([(roomId, room) for room in rooms])
+            self._rooms = SparkRoomList([(room.roomId, room)
+                                         for room in rooms])
             return rooms
         else:
             process_api_error(resp)

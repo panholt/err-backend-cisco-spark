@@ -335,7 +335,7 @@ class SparkRoom(Room):
                                headers=HEADERS)
         if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
-        else:
+        elif resp.status_code != 204:
             process_api_error(resp)
         return
 

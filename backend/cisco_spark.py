@@ -6,6 +6,7 @@ import requests
 import sys
 
 from time import sleep
+from collections import OrderedDict
 from errbot import webhook
 from errbot.errBot import ErrBot
 from errbot.backends.base import Message, Person, Room, RoomOccupant
@@ -22,7 +23,7 @@ ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
 
 def get_membership_by_room(roomId):
     resp = requests.get(API_BASE + 'memberships',
-                        headers=HEADERS, params={'roomId': key})
+                        headers=HEADERS, params={'roomId': roomId})
     if resp.status_code == 200:
         try:
             return resp.json()['id']
@@ -360,7 +361,7 @@ class SparkRoom(Room):
     __str__ = __unicode__
 
 
-class SparkRoomList(dict):
+class SparkRoomList(OrderedDict):
     '''
     subclassed dict to fetch missing rooms
     '''

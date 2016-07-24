@@ -59,7 +59,7 @@ class SparkWebhook(BotPlugin):
         self.log.debug('Got unknown request: {}'.format(request))
         return
 
-    @botcmd
+    @botcmd(split_args_with=SeparatorArgParser())
     def spark_room_list(self, message, args):
         '''
         List chatrooms the bot has joined.
@@ -75,7 +75,7 @@ class SparkWebhook(BotPlugin):
         else:
             return "I'm not currently in any rooms."
 
-    @botcmd
+    @botcmd(split_args_with=SeparatorArgParser())
     def spark_room_leave(self, message, args):
         '''
         List chatrooms the bot has joined.

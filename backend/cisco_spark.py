@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# vim: ts=4:sw=4
 import json
 import logging
 import time
@@ -456,7 +455,7 @@ class SparkBackend(ErrBot):
         return
 
     def query_room(self, roomId):
-        if room_text_rep.startswith(ROOM_PREFIX):
+        if roomId.startswith(ROOM_PREFIX):
             return self._rooms[room_text_rep]
         # The core plugin for create room expects a room object back
         else:

@@ -68,7 +68,7 @@ class SparkWebhook(BotPlugin):
         Examples:
         /room list
         '''
-        rooms = [room.title for room in self._rooms.values()]
+        rooms = [room.title for room in self._bot._rooms.values()]
         if len(rooms):
             return 'I\'m currently in these rooms:\n\t' + \
                     '{}'.format('\n\t'.join(rooms))
@@ -86,7 +86,7 @@ class SparkWebhook(BotPlugin):
         '''
         rooms = [room.title for room in self._bot._rooms.values()]
         if args[0].startswith('Y2lzY29zcGFyazovL3VzL1JPT00'):  # Room prefix
-            self._rooms[args[0]].leave()
+            self._bot._rooms[args[0]].leave()
             return 'Left {}'.format(self._bot_rooms[args[0]].title)
         elif args[0].isdigit():
             rooms[int(args[0]) - 1].leave()

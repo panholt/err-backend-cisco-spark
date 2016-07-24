@@ -26,7 +26,7 @@ def get_membership_by_room(roomId):
     resp = requests.get(API_BASE + 'memberships',
                         headers=HEADERS,
                         params={'roomId': roomId,
-                                'personId': BOT.identifier.personId})
+                                'personId': BOT.bot_identifier.personId})
     if resp.status_code == 200:
         try:
             return resp.json()['items'][0]['id']

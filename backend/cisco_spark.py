@@ -289,7 +289,6 @@ class SparkRoom(Room):
                               isModerator=membership['isModerator'],
                               isMonitor=membership['isMonitor'],
                               created=membership['created'],
-                              membershipId=membership['id'],
                               personDisplayName=membership['personDisplayName']
                               ))
         return _occupants

@@ -19,14 +19,16 @@ API_BASE = 'https://api.ciscospark.com/v1/'
 HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
+BOT_ID = ''
 
 
 def get_membership_by_room(roomId):
     resp = requests.get(API_BASE + 'memberships',
-                        headers=HEADERS, params={'roomId': roomId})
+                        headers=HEADERS, params={'roomId': roomId,
+                                                 'personId': BOT_ID})
     if resp.status_code == 200:
         try:
-            return resp.json()['id']
+            return resp.json()['items'][0]['id']
         except:
             log.debug('Error occured getting membership. Details: {}'
                       .format(resp.text))
@@ -393,6 +395,8 @@ class SparkBackend(ErrBot):
     def __init__(self, config):
         super().__init__(config)
         identity = config.BOT_IDENTITY
+        global BOT_ID
+        BOT_ID = identity.get('id')
         self.token = identity.get('token', None)
         if not self.token:
             log.fatal('Cannot find API token.')

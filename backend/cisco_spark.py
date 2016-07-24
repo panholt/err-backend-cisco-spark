@@ -336,7 +336,7 @@ class SparkRoom(Room):
 
         if resp.status_code == 204:
             del BOT._rooms[self.roomId]
-        if resp.status_code == 409:
+        elif resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
         else:
             process_api_error(resp)

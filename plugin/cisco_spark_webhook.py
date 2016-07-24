@@ -87,10 +87,10 @@ class SparkWebhook(BotPlugin):
         rooms = [room.title for room in self._bot._rooms.values()]
         if args[0].startswith('Y2lzY29zcGFyazovL3VzL1JPT00'):  # Room prefix
             self._bot._rooms[args[0]].leave()
-            return 'Left {}'.format(self._bot_rooms[args[0]].title)
+            yield 'Left {}'.format(self._bot_rooms[args[0]].title)
         elif args[0].isdigit():
             list(self._bot._rooms.values())[int(args[0]) - 1].leave()
-            return 'Left {}'.format(rooms[int(args[0]) - 1].title)
+            yield 'Left {}'.format(rooms[int(args[0]) - 1].title)
         else:
             yield 'Unknown room: {}'.format(args[0])
             yield 'Room must be a Spark Room Id or Index from /spark room list'

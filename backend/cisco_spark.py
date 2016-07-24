@@ -19,13 +19,14 @@ API_BASE = 'https://api.ciscospark.com/v1/'
 HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
-BOT_ID = ''
+BOT = None
 
 
 def get_membership_by_room(roomId):
     resp = requests.get(API_BASE + 'memberships',
-                        headers=HEADERS, params={'roomId': roomId,
-                                                 'personId': BOT_ID})
+                        headers=HEADERS,
+                        params={'roomId': roomId,
+                                'personId': BOT.identifier.personId})
     if resp.status_code == 200:
         try:
             return resp.json()['items'][0]['id']
@@ -333,9 +334,11 @@ class SparkRoom(Room):
                                .format(get_membership_by_room(self.roomId)),
                                headers=HEADERS)
 
+        if resp.status_code == 204:
+            del BOT._rooms[self.roomId]
         if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
-        elif resp.status_code != 204:  # Member deleted
+        else:
             process_api_error(resp)
         return
 
@@ -395,8 +398,6 @@ class SparkBackend(ErrBot):
     def __init__(self, config):
         super().__init__(config)
         identity = config.BOT_IDENTITY
-        global BOT_ID
-        BOT_ID = identity.get('id')
         self.token = identity.get('token', None)
         if not self.token:
             log.fatal('Cannot find API token.')
@@ -415,6 +416,8 @@ class SparkBackend(ErrBot):
             log.debug('No Webhook found matching targetUrl: {}'
                       .format(self.webhook_url))
             self.create_webhook()
+        global BOT
+        BOT = self
 
     @property
     def display_name(self):

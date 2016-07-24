@@ -89,7 +89,7 @@ class SparkWebhook(BotPlugin):
             self._bot._rooms[args[0]].leave()
             return 'Left {}'.format(self._bot_rooms[args[0]].title)
         elif args[0].isdigit():
-            self._bot._rooms.values().leave()
+            self._bot._rooms.values()[int(args[0]) - 1].leave()
             return 'Left {}'.format(rooms[int(args[0]) - 1].title)
         else:
             yield 'Unknown room: {}'.format(args[0])

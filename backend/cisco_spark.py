@@ -333,10 +333,7 @@ class SparkRoom(Room):
         resp = requests.delete(API_BASE + 'memberships/{}'
                                .format(get_membership_by_room(self.roomId)),
                                headers=HEADERS)
-
-        if resp.status_code == 204:
-            del BOT._rooms[self.roomId]
-        elif resp.status_code == 409:
+        if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
         else:
             process_api_error(resp)

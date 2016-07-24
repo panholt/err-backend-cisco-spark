@@ -42,6 +42,19 @@ def process_api_error(resp):
                     .format(resp.status_code))
 
 
+def get_all_pages(resp):
+    '''
+    Takes a response object and returns a list of all items across all pages
+    '''
+    data = resp.json()['items']
+    while resp.links.get('next'):
+        resp = requests.get(resp.links['next']['url'], headers=HEADERS)
+        if resp.status_code != 200:
+            process_api_error(resp)
+        data += resp.json().get('items', [])
+    return data
+
+
 class SparkPerson(Person):
     '''
     This class represents a Spark User
@@ -266,14 +279,7 @@ class SparkRoom(Room):
         if resp.status_code != 200:
             process_api_error(resp)
 
-        data = resp.json().get('items', [])
-
-        # Use weblinks to fetch all pages of the pagninated response
-        while resp.links.get('next'):
-            resp = requests.get(resp.links['next']['url'], headers=HEADERS)
-            if resp.status_code != 200:
-                process_api_error(resp)
-            data += resp.json().get('items', [])
+        data = get_all_pages(resp)
 
         for membership in data:
             _occupants.append(SparkRoomOccupant(
@@ -549,14 +555,9 @@ class SparkBackend(ErrBot):
 
         resp = requests.get(API_BASE + 'rooms', headers=HEADERS)
         if resp.status_code == 200:
-            try:
-                data = resp.json()
-            except ValueError:
-                log.debug('Failed to decode response with status code: ' +
-                          '{} and body: {}'.format(resp.status_code, resp.text)
-                          )
+            data = get_all_pages(resp)
             rooms = []
-            for room in data.get('items', []):
+            for room in data:
                 rooms.append(SparkRoom(roomId=room['id'],
                                        title=room['title'],
                                        roomType=room['type'],
@@ -565,9 +566,12 @@ class SparkBackend(ErrBot):
                                        created=room['created'],
                                        teamId=room.get('teamId')
                                        ))
+            # Refresh the room cache
+            self._rooms = SparkRoomList([(roomId, room) for room in rooms])
             return rooms
         else:
-            return []
+            process_api_error(resp)
+        return
 
     def serve_forever(self):
         log.debug('Entering serve forever')

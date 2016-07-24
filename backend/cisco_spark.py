@@ -456,11 +456,11 @@ class SparkBackend(ErrBot):
 
     def query_room(self, roomId):
         if roomId.startswith(ROOM_PREFIX):
-            return self._rooms[room_text_rep]
+            return self._rooms[roomId]
         # The core plugin for create room expects a room object back
         else:
             room = SparkRoom(roomId=None,
-                             title=room_text_rep,
+                             title=roomId,
                              roomType='group',
                              isLocked=False,
                              lastActivity=None,

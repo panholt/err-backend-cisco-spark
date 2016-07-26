@@ -4,6 +4,7 @@ import logging
 import time
 import requests
 import sys
+import websocket
 
 from time import sleep
 from collections import OrderedDict
@@ -404,15 +405,22 @@ class SparkBackend(ErrBot):
         self.bot_identifier = self.build_identifier(identity.get('id'))
         self._display_name = identity['email'].split('@')[0]
         self._email = identity['email']
-        self._webhook_url = config.WEBHOOK_URL
         self._rooms = SparkRoomList([(room.roomId, room)
                                     for room in self.rooms()])
+        self.ws = websocket.WebSocket()
+
+        self.ws.connect(config.WEBSOCKET_PROXY)
+        self._webhook_url = json.loads(self.ws.recv()).get('url')
+
+        if self.webhook_url is None:
+            raise Exception('Failed to fetch Webhook URL')
 
         if not any((hook['targetUrl'] == self.webhook_url
                    for hook in self.get_webhooks())):
             log.debug('No Webhook found matching targetUrl: {}'
                       .format(self.webhook_url))
-            self.create_webhook()
+            self._webhook_id = self.create_webhook()
+        
         global BOT
         BOT = self
 
@@ -427,10 +435,16 @@ class SparkBackend(ErrBot):
     @property
     def webhook_url(self):
         return self._webhook_url
+    
+    @property
+    def webhook_id(self):
+        return self._webhook_id
+    
 
     @property
     def mode(self):
         return 'spark'
+
 
     def get_webhooks(self):
         log.debug('Fetching Webhooks')
@@ -441,11 +455,15 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self):
-        return requests.post(API_BASE + 'webhooks', headers=HEADERS,
+        resp = requests.post(API_BASE + 'webhooks', headers=HEADERS,
                              json={'name': 'Spark Errbot Webhook',
                                    'targetUrl': self.webhook_url,
                                    'resource': 'all',
                                    'event': 'all'})
+        if resp.status_code != 200:
+            process_api_error(resp)
+        else:
+            return resp.json().get('id')
 
     def build_identifier(self, text_representation, room_id=False):
         log.debug('Build Identifier called with {}'
@@ -583,7 +601,18 @@ class SparkBackend(ErrBot):
         try:
             self.connect_callback()
             while True:
-                sleep(300)
+                data = self.ws.recv()
+                try:
+                    event = json.loads(data).get('data')
+                    log.debug('Received event on websocket: {}'.format(data))
+                except ValueError:
+                    log.debug('Undecodable json received from proxy: {}'
+                              .format(data))
+                if event['data']['personId'] != self.bot_identifier:
+                    # don't bother processing messages from the bot.
+                    message = self.decrypt_message(event['data']['id'])
+                    log.debug('To is group: {}'.format(message.is_group))
+                    self.callback_message(message)
 
         except KeyboardInterrupt:
             log.debug('KeyboardInterrupt received')
@@ -592,5 +621,11 @@ class SparkBackend(ErrBot):
             log.debug('Caught Exception: {}'.format(e))
         finally:
             log.info('Received keyboard interrupt. Shutdown requested.')
+            log.debug('Deleting ephemeral webhook')
+            resp = requests.delete(API_BASE + 'webhooks/{}'.format(self.webhook_id),
+                                   headers=HEADERS)
+            if resp.status_code != 204:
+                process_api_error(resp)
+            self.ws.close()
             self.disconnect_callback()
             self.shutdown()

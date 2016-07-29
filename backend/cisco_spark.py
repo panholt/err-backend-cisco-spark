@@ -410,7 +410,11 @@ class SparkBackend(ErrBot):
         self.ws = websocket.WebSocket()
 
         self.ws.connect(config.WEBSOCKET_PROXY)
-        self._webhook_url = json.loads(self.ws.recv()).get('url')
+        #self._webhook_url = json.loads(self.ws.recv()).get('url')
+        #remove once we start getting secure urls
+        webhook_url = json.loads(self.ws.recv()).get('url')
+        webhook_url = webhook_url.replace('http', 'https')
+        webhook_url = webhook_url.replace('12345', '8443')
 
         if self.webhook_url is None:
             raise Exception('Failed to fetch Webhook URL')

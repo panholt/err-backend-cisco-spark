@@ -3,6 +3,7 @@ This is an errbot (http://errbot.net) backend for Cisco Spark (https://www.cisco
 
 ## Requirements
 Python Requests (https://github.com/kennethreitz/requests)
+
 Python Websocket-client (https://github.com/liris/websocket-client)
 
 
@@ -17,7 +18,6 @@ git clone https://github.com/panholt/err-backend-cisco-spark.git
 ```
 BACKEND = 'Cisco Spark'
 BOT_EXTRA_BACKEND_DIR = '/path_to/err-backend-cisco-spark'
-BOT_EXTRA_PLUGIN_DIR = '/path_to/cisco-spark-webhook-plugin'
 ```
 
 to your config.py

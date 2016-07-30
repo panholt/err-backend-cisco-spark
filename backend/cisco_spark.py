@@ -389,7 +389,7 @@ class SparkRoomList(OrderedDict):
             if resp.status_code != 200:
                 process_api_error(resp)
 
-            data = resp.json().get['items'].pop()
+            data = resp.json().get('items').pop()
             self[key] = SparkRoom(roomId=data['id'],
                                   title=data['title'],
                                   roomType=data['type'],

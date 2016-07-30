@@ -376,7 +376,7 @@ class SparkRoomList(OrderedDict):
             if resp.status_code != 200:
                 process_api_error(resp)
 
-            data = resp.json().get['items']
+            data = resp.json().get['items'].pop()
             self[key] = SparkRoom(roomId=data['id'],
                                   title=data['title'],
                                   roomType=data['type'],
@@ -405,26 +405,14 @@ class SparkBackend(ErrBot):
         self.bot_identifier = self.build_identifier(identity.get('id'))
         self._display_name = identity['email'].split('@')[0]
         self._email = identity['email']
+        self._webhook_id = None
+        self._webhook_url = None
         self._rooms = SparkRoomList([(room.roomId, room)
                                     for room in self.rooms()])
-        self.ws = websocket.WebSocket()
-
-        self.ws.connect(config.WEBSOCKET_PROXY)
-        # self._webhook_url = json.loads(self.ws.recv()).get('url')
-        # remove once we start getting secure urls
-        webhook_url = json.loads(self.ws.recv()).get('url')
-        webhook_url = webhook_url.replace('http', 'https')
-        webhook_url = webhook_url.replace('12345', '8443')
-
-        if self.webhook_url is None:
-            raise Exception('Failed to fetch Webhook URL')
-
-        if not any((hook['targetUrl'] == self.webhook_url
-                   for hook in self.get_webhooks())):
-            log.debug('No Webhook found matching targetUrl: {}'
-                      .format(self.webhook_url))
-            self._webhook_id = self.create_webhook()
-
+        self.ws = websocket.WebSocketApp(config.WEBSOCKET_PROXY,
+                                         on_message=self.ws_message_callback,
+                                         on_error=self.ws_error_callback,
+                                         on_close=self.ws_close_callback)
         global BOT
         BOT = self
 
@@ -440,9 +428,24 @@ class SparkBackend(ErrBot):
     def webhook_url(self):
         return self._webhook_url
 
+    @webhook_url.setter
+    def webhook_url(self, value):
+        if self._webhook_url and self.webhook_id:
+            log.debug('Received a new webhook url ' +
+                      'but one already exists. Deleting existing')
+            self.delete_webhook(self.webhook_id)
+
+        self.webhook_id = self.create_webhook(value)
+        self._webhook_url = value
+        return
+
     @property
     def webhook_id(self):
         return self._webhook_id
+
+    @webhook_id.setter
+    def webhook_id(self, value):
+        self._webhook_id = value
 
     @property
     def mode(self):
@@ -456,16 +459,58 @@ class SparkBackend(ErrBot):
         data = resp.json()
         return data['items']
 
-    def create_webhook(self):
+    def create_webhook(self, url):
         resp = requests.post(API_BASE + 'webhooks', headers=HEADERS,
                              json={'name': 'Spark Errbot Webhook',
-                                   'targetUrl': self.webhook_url,
-                                   'resource': 'all',
-                                   'event': 'all'})
+                                   'targetUrl': url,
+                                   'resource': 'messages',
+                                   'event': 'created'})
         if resp.status_code != 200:
             process_api_error(resp)
         else:
             return resp.json().get('id')
+
+    def delete_webhook(self, webhook_id):
+        resp = requests.delete(API_BASE + 'webhooks/{}'
+                               .format(webhook_id),
+                               headers=HEADERS)
+        if resp.status_code != 204:
+            process_api_error(resp)
+        self._webhook_id = None
+        self._webhook_url = None
+        return
+
+    def ws_message_callback(self, ws, message):
+        try:
+            event = json.loads(message)
+        except ValueError:
+            log.debug('Invalid json received from websocket: {}'.format(event))
+        if event.get('url'):
+            # First event received, should be our webhook url
+            webhook_url = event.get('url')
+            # Fix up required
+            webhook_url = webhook_url.replace('http', 'https')
+            webhook_url = webhook_url.replace('12345', '8443')
+            self.webhook_url = webhook_url
+        elif event.get('data'):
+            log.debug('Received event: {}'.format(event.get('data')))
+            if event['data']['data']['personId'] != self.bot_identifier:
+                # don't bother processing messages from the bot.
+                message = self.decrypt_message(event['data']['data']['id'])
+                self.callback_message(message)
+        else:
+            log.debug('Unknown event type received: {}'.format(event))
+        return
+
+    def ws_error_callback(self, ws, error):
+        if self.webhook_id:
+            self.delete_webhook(self.webhook_id)
+        raise error
+
+    def ws_close_callback(self, ws):
+        if self.webhook_id:
+            self.delete_webhook(self.webhook_id)
+        return
 
     def build_identifier(self, text_representation, room_id=False):
         log.debug('Build Identifier called with {}'
@@ -602,20 +647,7 @@ class SparkBackend(ErrBot):
         log.debug('Entering serve forever')
         try:
             self.connect_callback()
-            while True:
-                data = self.ws.recv()
-                try:
-                    event = json.loads(data).get('data')
-                    log.debug('Received event on websocket: {}'.format(data))
-                except ValueError:
-                    log.debug('Undecodable json received from proxy: {}'
-                              .format(data))
-                if event['data']['personId'] != self.bot_identifier:
-                    # don't bother processing messages from the bot.
-                    message = self.decrypt_message(event['data']['id'])
-                    log.debug('To is group: {}'.format(message.is_group))
-                    self.callback_message(message)
-
+            self.ws.run_forever(ping_interval=60)
         except KeyboardInterrupt:
             log.debug('KeyboardInterrupt received')
             pass
@@ -623,12 +655,9 @@ class SparkBackend(ErrBot):
             log.debug('Caught Exception: {}'.format(e))
         finally:
             log.info('Received keyboard interrupt. Shutdown requested.')
-            log.debug('Deleting ephemeral webhook')
-            resp = requests.delete(API_BASE + 'webhooks/{}'
-                                   .format(self.webhook_id),
-                                   headers=HEADERS)
-            if resp.status_code != 204:
-                process_api_error(resp)
             self.ws.close()
+            if self.webhook_id:
+                log.debug('Deleting ephemeral webhook')
+                self.delete_webhook(self.webhook_id)
             self.disconnect_callback()
             self.shutdown()

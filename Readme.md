@@ -2,7 +2,8 @@
 This is an errbot (http://errbot.net) backend for Cisco Spark (https://www.ciscospark.com/)
 
 ## Requirements
-Python Requests
+Python Requests (https://github.com/kennethreitz/requests)
+Python Websocket-client (https://github.com/liris/websocket-client)
 
 
 ## Installation
@@ -40,23 +41,9 @@ BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS...',    #PersonId of bot admins
           )
 ```
 
-## Webserver configuration
-The Cisco Spark backend will not work properly without first configuring the errbot Webserver plugin. To do so, first start errbot in the text backend and supply the proper configuration:
+## Websocket Proxy
+The WEBSOCKET_PROXY key is used to setup the Websocket.
 
-```
-$ errbot -T
->>> /plugin config Webserver {'HOST': '0.0.0.0', 'PORT': 80,  'SSL': {'certificate': '', 'enabled': False, 'host': '0.0.0.0', 'key': '', 'port': 443}}
-```
-
-Change the HTTP and HTTPS ports to suit your environment.
-
-Next, add the WEBHOOK_URL key to errbot's config.py to the your webhook receiver URL:
-
-```
-WEBHOOK_URL = 'http://some_host.com/incoming'
-```
-
-The Cisco Spark Backend will automatically create the Webhooks using the Cisco Spark API.
 
 ## Contributing
 

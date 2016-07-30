@@ -410,8 +410,8 @@ class SparkBackend(ErrBot):
         self.ws = websocket.WebSocket()
 
         self.ws.connect(config.WEBSOCKET_PROXY)
-        #self._webhook_url = json.loads(self.ws.recv()).get('url')
-        #remove once we start getting secure urls
+        # self._webhook_url = json.loads(self.ws.recv()).get('url')
+        # remove once we start getting secure urls
         webhook_url = json.loads(self.ws.recv()).get('url')
         webhook_url = webhook_url.replace('http', 'https')
         webhook_url = webhook_url.replace('12345', '8443')
@@ -424,7 +424,7 @@ class SparkBackend(ErrBot):
             log.debug('No Webhook found matching targetUrl: {}'
                       .format(self.webhook_url))
             self._webhook_id = self.create_webhook()
-        
+
         global BOT
         BOT = self
 
@@ -439,16 +439,14 @@ class SparkBackend(ErrBot):
     @property
     def webhook_url(self):
         return self._webhook_url
-    
+
     @property
     def webhook_id(self):
         return self._webhook_id
-    
 
     @property
     def mode(self):
         return 'spark'
-
 
     def get_webhooks(self):
         log.debug('Fetching Webhooks')
@@ -626,7 +624,8 @@ class SparkBackend(ErrBot):
         finally:
             log.info('Received keyboard interrupt. Shutdown requested.')
             log.debug('Deleting ephemeral webhook')
-            resp = requests.delete(API_BASE + 'webhooks/{}'.format(self.webhook_id),
+            resp = requests.delete(API_BASE + 'webhooks/{}'
+                                   .format(self.webhook_id),
                                    headers=HEADERS)
             if resp.status_code != 204:
                 process_api_error(resp)

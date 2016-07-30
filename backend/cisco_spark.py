@@ -151,13 +151,26 @@ class SparkPerson(Person):
     aclattr = person
 
     def get_person_details(self):
-        resp = requests.get(API_BASE + 'people/{}'.format(self.personId),
-                            headers=HEADERS)
+        if self._personId:  # Use the protected attrib to avoid recursion
+            resp = requests.get(API_BASE + 'people/{}'.format(self.personId),
+                                headers=HEADERS)
+        elif self._personEmail:
+            resp = requests.get(API_BASE + 'people',
+                                params={'email': self.personEmail},
+                                headers=HEADERS)
+        elif self._personDisplayName:
+            resp = requests.get(API_BASE + 'people',
+                                params={'displayName': self.personDisplayName},
+                                headers=HEADERS)
         if resp.status_code == 200:
             data = resp.json()
+            if data.get('items'):
+                data = data.get('items').pop()
             self.personId = data['id']
             self.personDisplayName = data['displayName']
             self.personEmail = data['emails'].pop()
+        else:
+            process_api_error(resp)
         return
 
     def __eq__(self, other):
@@ -375,7 +388,7 @@ class SparkRoomList(OrderedDict):
             if resp.status_code != 200:
                 process_api_error(resp)
 
-            data = resp.json()
+            data = resp.json().get('items').pop()
             self[key] = SparkRoom(roomId=data['id'],
                                   title=data['title'],
                                   roomType=data['type'],
@@ -395,15 +408,14 @@ class SparkBackend(ErrBot):
     def __init__(self, config):
         super().__init__(config)
         identity = config.BOT_IDENTITY
-        self.token = identity.get('token', None)
-        if not self.token:
+        self.token = config.BOT_IDENTITY.get('token')
+        if self.token:
+            HEADERS['Authorization'] = 'Bearer {}'.format(self.token)
+        else:
             log.fatal('Cannot find API token.')
             sys.exit(1)
-        else:
-            HEADERS['Authorization'] = 'Bearer {}'.format(self.token)
-        self.bot_identifier = self.build_identifier(identity.get('id'))
-        self._display_name = identity['email'].split('@')[0]
-        self._email = identity['email']
+
+        self.bot_identifier = self.build_self_identitiy()
         self._webhook_url = config.WEBHOOK_URL
         self._rooms = SparkRoomList([(room.roomId, room)
                                     for room in self.rooms()])
@@ -431,6 +443,17 @@ class SparkBackend(ErrBot):
     @property
     def mode(self):
         return 'spark'
+
+    def build_self_identitiy(self):
+        resp = requests.get(API_BASE + 'people/me', headers=HEADERS)
+        if resp.status_code != 200:
+            process_api_error
+        else:
+            data = resp.json()
+            return SparkPerson(personId=data['id'],
+                               personDisplayName=data['displayName'],
+                               personEmail=data['emails'].pop())
+        return
 
     def get_webhooks(self):
         log.debug('Fetching Webhooks')

@@ -501,9 +501,6 @@ class SparkBackend(ErrBot):
         if event.get('url'):
             # First event received, should be our webhook url
             webhook_url = event.get('url')
-            # Fix up required
-            webhook_url = webhook_url.replace('http', 'https')
-            webhook_url = webhook_url.replace('12345', '8443')
             self.webhook_url = webhook_url
         elif event.get('data'):
             log.debug('Received event: {}'.format(event.get('data')))

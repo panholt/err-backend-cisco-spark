@@ -425,6 +425,7 @@ class SparkBackend(ErrBot):
                                          on_message=self.ws_message_callback,
                                          on_error=self.ws_error_callback,
                                          on_close=self.ws_close_callback)
+        self.build_alt_prefixes()
         global BOT
         BOT = self
 
@@ -466,6 +467,26 @@ class SparkBackend(ErrBot):
             return SparkPerson(personId=data['id'],
                                personDisplayName=data['displayName'],
                                personEmail=data['emails'].pop())
+
+    def build_alt_prefixes(self):
+        words = self.bot_identifier.personDisplayName.split(' ')
+        new_prefixes = []
+        if len(words) > 1:
+            for x in range(len(words)):
+                new_prefixes.append(' '.join(words[:x+1]))
+        else:
+            new_prefixes.append(self.bot_identifier.personDisplayName)
+
+        try:
+            bot_prefixes = self.bot_config.BOT_ALT_PREFIXES.split(',')
+        except AttributeError:
+            bot_prefixes = list(self.bot_config.BOT_ALT_PREFIXES)
+
+        self.bot_alt_prefixes = tuple(new_prefixes + bot_prefixes)
+        # Errbot wont consider alt prefixes if the key doesn't exist in the config
+        if len(self.bot_config.BOT_ALT_PREFIXES) < 1:
+            self.bot_config.BOT_ALT_PREFIXES = self.bot_alt_prefixes
+        return
 
     def get_webhooks(self):
         log.debug('Fetching Webhooks')

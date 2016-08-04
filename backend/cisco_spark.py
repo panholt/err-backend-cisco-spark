@@ -620,14 +620,6 @@ class SparkBackend(ErrBot):
         data = resp.json()
         text = data.get('text', '')
 
-        log.debug('Text before substitution: {}'.format(text))
-        # Currently Spark sends the @mention text without the @ sign
-        # Apparently this is unintentional and will be fixed....
-        # This is a hack to remove it and skip straight to the command
-        if '/' in text:
-            text = '/' + text.split('/', 1)[-1]
-        log.debug('Text after substituion: {}'.format(text))
-
         message = Message(text)
         message.frm = self.build_identifier(data.get('personId'),
                                             room_id=data.get('roomId'))

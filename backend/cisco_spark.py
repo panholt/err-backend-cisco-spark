@@ -418,6 +418,7 @@ class SparkBackend(ErrBot):
         self.bot_identifier = self.build_self_identitiy()
         self._webhook_id = None
         self._webhook_url = None
+        self._webhook_secret = None
         self._rooms = SparkRoomList([(room.roomId, room)
                                     for room in self.rooms()])
         self.ws = websocket.WebSocketApp(config.WEBSOCKET_PROXY,
@@ -433,12 +434,6 @@ class SparkBackend(ErrBot):
 
     @webhook_url.setter
     def webhook_url(self, value):
-        if self._webhook_url and self.webhook_id:
-            log.debug('Received a new webhook url ' +
-                      'but one already exists. Deleting existing')
-            self.delete_webhook(self.webhook_id)
-
-        self.webhook_id = self.create_webhook(value)
         self._webhook_url = value
         return
 
@@ -449,6 +444,14 @@ class SparkBackend(ErrBot):
     @webhook_id.setter
     def webhook_id(self, value):
         self._webhook_id = value
+
+    @property
+    def webhook_secret(self):
+        return self._webhook_secret
+
+    @webhook_secret.setter
+    def webhook_secret(self, value):
+        self._webhook_secret = value
 
     @property
     def mode(self):
@@ -472,12 +475,14 @@ class SparkBackend(ErrBot):
         data = resp.json()
         return data['items']
 
-    def create_webhook(self, url):
-        resp = requests.post(API_BASE + 'webhooks', headers=HEADERS,
-                             json={'name': 'Spark Errbot Webhook',
-                                   'targetUrl': url,
-                                   'resource': 'messages',
-                                   'event': 'created'})
+    def create_webhook(self, url, secret):
+        data = {'name': 'Spark Errbot Webhook',
+                'targetUrl': url,
+                'resource': 'messages',
+                'event': 'created'}
+        if secret:
+            data['secret'] = secret
+        resp = requests.post(API_BASE + 'webhooks', headers=HEADERS, json=data)
         if resp.status_code != 200:
             process_api_error(resp)
         else:
@@ -491,17 +496,26 @@ class SparkBackend(ErrBot):
             process_api_error(resp)
         self._webhook_id = None
         self._webhook_url = None
+        self._webhook_secret = None
         return
 
     def ws_message_callback(self, ws, message):
         try:
             event = json.loads(message)
         except ValueError:
-            log.debug('Invalid json received from websocket: {}'.format(event))
+            log.error('Invalid json received from websocket: {}'.format(event))
+            return
         if event.get('url'):
             # First event received, should be our webhook url
-            webhook_url = event.get('url')
-            self.webhook_url = webhook_url
+            log.debug('Received url event: {}'.format(event))
+            if self._webhook_url and self.webhook_id:
+                log.debug('Received a new webhook url ' +
+                          'but one already exists. Deleting existing')
+                self.delete_webhook(self.webhook_id)
+            self.webhook_url = event.get('url')
+            self.webhook_secret = event.get('secret')
+            self.webhook_id = self.create_webhook(self.webhook_url, self.webhook_secret)
+
         elif event.get('data'):
             log.debug('Received event: {}'.format(event.get('data')))
             if event['data']['data']['personId'] != self.bot_identifier:

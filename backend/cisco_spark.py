@@ -609,7 +609,8 @@ class SparkBackend(ErrBot):
 
     def send_message(self, message, files=None):
         super().send_message(message)
-        data = {'markdown': self.md.convert(message.body)}
+        log.debug('Text is: {}'.format(message.body))
+        data = {'markdown': self.md.convert(message.body).replace('\n', '\n\n')}
         to = str(message.to)
         log.debug('Entered send_message with To: {}'.format(to))
         if message.is_direct:

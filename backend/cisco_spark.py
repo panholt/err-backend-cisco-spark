@@ -4,15 +4,17 @@ import logging
 import time
 import requests
 import sys
+import re
 import websocket
 
-from markdown import Markdown
-from markdown.extensions.extra import ExtraExtension
+# from markdown import Markdown
+# from markdown.extensions.extra import ExtraExtension
 from collections import OrderedDict
 from errbot import webhook
 from errbot.errBot import ErrBot
 from errbot.backends.base import Message, Person, Room, RoomOccupant
-from errbot.rendering.ansiext import AnsiExtension, enable_format, IMTEXT_CHRS
+# from errbot.rendering.ansiext import AnsiExtension, enable_format, IMTEXT_CHRS
+from errbot.rendering import md
 
 # Can't use __name__ because of Yapsy
 log = logging.getLogger('errbot.backends.spark')
@@ -23,6 +25,7 @@ HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
 BOT = None
+NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)')
 
 
 def get_membership_by_room(roomId):
@@ -61,11 +64,10 @@ def get_all_pages(resp):
         data += resp.json().get('items', [])
     return data
 
-def spark_markdown_converter(compact_output=False):
-    md = Markdown(output_format='imtext', extensions=[ExtraExtension(), AnsiExtension()])
-    md.stripTopLevelTags = False
-    return md
-
+# def spark_markdown_converter(compact_output=False):
+#     md = Markdown(output_format='imtext', extensions=[ExtraExtension(), AnsiExtension()])
+#     md.stripTopLevelTags = False
+#     return md
 
 class SparkPerson(Person):
     '''
@@ -423,7 +425,7 @@ class SparkBackend(ErrBot):
             sys.exit(1)
 
         self.bot_identifier = self.build_self_identitiy()
-        self.md = spark_markdown_converter()
+        self.md = md()
         self._webhook_id = None
         self._webhook_url = None
         self._webhook_secret = None
@@ -505,6 +507,8 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
+        url = url.replace('http', 'https')
+        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'messages',
@@ -610,7 +614,7 @@ class SparkBackend(ErrBot):
     def send_message(self, message, files=None):
         super().send_message(message)
         log.debug('Text is: {}'.format(message.body))
-        data = {'markdown': self.md.convert(message.body).replace('\n', '\n\n')}
+        data = {'markdown': self.md.convert(NEWLINE_RE.sub(r'  \n', message.body))}
         to = str(message.to)
         log.debug('Entered send_message with To: {}'.format(to))
         if message.is_direct:

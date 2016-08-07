@@ -7,13 +7,10 @@ import sys
 import re
 import websocket
 
-# from markdown import Markdown
-# from markdown.extensions.extra import ExtraExtension
 from collections import OrderedDict
 from errbot import webhook
 from errbot.errBot import ErrBot
 from errbot.backends.base import Message, Person, Room, RoomOccupant
-# from errbot.rendering.ansiext import AnsiExtension, enable_format, IMTEXT_CHRS
 from errbot.rendering import md
 
 # Can't use __name__ because of Yapsy
@@ -25,7 +22,7 @@ HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
 BOT = None
-NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)')
+NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)') # Single \n only, not \n\n
 
 
 def get_membership_by_room(roomId):
@@ -63,11 +60,6 @@ def get_all_pages(resp):
             process_api_error(resp)
         data += resp.json().get('items', [])
     return data
-
-# def spark_markdown_converter(compact_output=False):
-#     md = Markdown(output_format='imtext', extensions=[ExtraExtension(), AnsiExtension()])
-#     md.stripTopLevelTags = False
-#     return md
 
 class SparkPerson(Person):
     '''
@@ -507,8 +499,6 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
-        url = url.replace('http', 'https')
-        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'messages',

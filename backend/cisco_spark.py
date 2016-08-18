@@ -619,10 +619,7 @@ class SparkBackend(ErrBot):
         if resp.status_code == 200:
             return
         else:
-            raise Exception('Recevied a {} from {} with body {}'
-                            .format(resp.status_code,
-                                    resp.request.url,
-                                    resp.request.body))
+            process_api_error(resp)
 
     def change_presence(self, status, message):
         log.debug('Presence is not implemented by the Spark backend')

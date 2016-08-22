@@ -8,7 +8,8 @@ import re
 import websocket
 
 from collections import OrderedDict
-from errbot import webhook
+from time import sleep
+
 from errbot.errBot import ErrBot
 from errbot.backends.base import Message, Person, Room, RoomOccupant
 from errbot.rendering import md
@@ -18,18 +19,16 @@ log = logging.getLogger('errbot.backends.spark')
 
 # Constants
 API_BASE = 'https://api.ciscospark.com/v1/'
-HEADERS = {'Content-type': 'application/json; charset=utf-8'}
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
-BOT = None
 NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)') # Single \n only, not \n\n
-
+BOT = None
+SESSION = requests.session()
 
 def get_membership_by_room(roomId):
-    resp = requests.get(API_BASE + 'memberships',
-                        headers=HEADERS,
-                        params={'roomId': roomId,
-                                'personId': BOT.bot_identifier.personId})
+    resp = SESSION.get(API_BASE + 'memberships',
+                       params={'roomId': roomId,
+                               'personId': BOT.bot_identifier.personId})
     if resp.status_code == 200:
         try:
             return resp.json()['items'][0]['id']
@@ -40,6 +39,19 @@ def get_membership_by_room(roomId):
         process_api_error(resp)
     return
 
+def retry_after_hook(resp, *args, **kwargs):
+    '''
+    Requests request hook. Looks for a 429 response
+    Will sleep for the proper interval and then retry
+    '''
+    if resp.status_code == 429:
+        sleepy_time = int(r.headers.get('Retry-After', 15))
+        log.debug('Received 429 Response. Sleeping for: {} secs'
+                  .format(sleepy_time))
+        sleep(sleepy_time)
+        return SESSION.send(resp.request)
+    else:
+        return
 
 def process_api_error(resp):
     log.debug('Recevied a: {} response from Cisco Spark'
@@ -55,7 +67,7 @@ def get_all_pages(resp):
     '''
     data = resp.json()['items']
     while resp.links.get('next'):
-        resp = requests.get(resp.links['next']['url'], headers=HEADERS)
+        resp = SESSION.get(resp.links['next']['url'])
         if resp.status_code != 200:
             process_api_error(resp)
         data += resp.json().get('items', [])
@@ -154,16 +166,13 @@ class SparkPerson(Person):
 
     def get_person_details(self):
         if self._personId:  # Use the protected attrib to avoid recursion
-            resp = requests.get(API_BASE + 'people/{}'.format(self.personId),
-                                headers=HEADERS)
+            resp = SESSION.get('{}people/{}'.format(API_BASE, self.personId))
         elif self._personEmail:
-            resp = requests.get(API_BASE + 'people',
-                                params={'email': self.personEmail},
-                                headers=HEADERS)
+            resp = SESSION.get(API_BASE + 'people',
+                               params={'email': self.personEmail})
         elif self._personDisplayName:
-            resp = requests.get(API_BASE + 'people',
-                                params={'displayName': self.personDisplayName},
-                                headers=HEADERS)
+            resp = SESSION.get(API_BASE + 'people',
+                               params={'displayName': self.personDisplayName})
         if resp.status_code == 200:
             data = resp.json()
             if data.get('items'):
@@ -249,8 +258,8 @@ class SparkRoom(Room):
         if self.roomType == 'direct':
             raise ValueError('Cannot change the title of a direct room')
         else:
-            resp = requests.put(API_BASE + 'rooms/{}'.format(self.roomId),
-                                headers=HEADERS, json={'title': value})
+            resp = SESSION.put(API_BASE + 'rooms/{}'.format(self.roomId),
+                               json={'title': value})
             if resp.status_code == 200:
                 self._title = value
                 return
@@ -293,8 +302,8 @@ class SparkRoom(Room):
     @property
     def occupants(self):
         _occupants = []
-        resp = requests.get('https://api.ciscospark.com/v1/memberships',
-                            params={'roomId': self.roomId}, headers=HEADERS)
+        resp = SESSION.get('https://api.ciscospark.com/v1/memberships',
+                           params={'roomId': self.roomId})
         if resp.status_code != 200:
             process_api_error(resp)
 
@@ -325,8 +334,8 @@ class SparkRoom(Room):
                             'Must be an email address or Spark personId'
                             .format(person))
 
-        resp = requests.post(API_BASE + 'memberships',
-                             json=data, headers=HEADERS)
+        resp = SESSION.post(API_BASE + 'memberships',
+                            json=data)
         if resp.status_code == 409:
             log.debug('Received 409 Response adding user to room. Body: {}'
                       .format(resp.text))
@@ -335,8 +344,7 @@ class SparkRoom(Room):
         return
 
     def create(self):
-        resp = requests.post(API_BASE + 'rooms', headers=HEADERS,
-                             json={'title': self.title})
+        resp = SESSION.post(API_BASE + 'rooms', json={'title': self.title})
         data = resp.json()
         self.roomId = data['id']
         return
@@ -345,9 +353,8 @@ class SparkRoom(Room):
         log.debug('Leaving room: {} with membership: {}'
                   .format(self.roomId, get_membership_by_room(self.roomId)))
 
-        resp = requests.delete(API_BASE + 'memberships/{}'
-                               .format(get_membership_by_room(self.roomId)),
-                               headers=HEADERS)
+        resp = SESSION.delete(API_BASE + 'memberships/{}'
+                              .format(get_membership_by_room(self.roomId)))
         if resp.status_code == 409:
             raise Exception('Unable to leave moderated room')
         elif resp.status_code != 204:
@@ -355,8 +362,7 @@ class SparkRoom(Room):
         return
 
     def destroy(self):
-        resp = requests.delete(API_BASE + 'rooms/{}'.format(self.roomId),
-                               headers=HEADERS)
+        resp = SESSION.delete(API_BASE + 'rooms/{}'.format(self.roomId))
         if resp.status_code == 409:
             raise Exception('Unable to delete moderated room')
         elif resp.status_code != 204:  # Member deleted
@@ -385,8 +391,7 @@ class SparkRoomList(OrderedDict):
 
     def __missing__(self, key):
         if key.startswith(ROOM_PREFIX):
-            resp = requests.get(API_BASE + 'rooms/'.format(key),
-                                headers=HEADERS)
+            resp = SESSION.get(API_BASE + 'rooms/'.format(key))
             if resp.status_code != 200:
                 process_api_error(resp)
 
@@ -411,7 +416,9 @@ class SparkBackend(ErrBot):
         super().__init__(config)
         self.token = config.BOT_IDENTITY.get('token')
         if self.token:
-            HEADERS['Authorization'] = 'Bearer {}'.format(self.token)
+            SESSION.headers = {'Content-type': 'application/json; charset=utf-8',
+                               'Authorization': 'Bearer {}'.format(self.token)}
+            SESSION.hooks = {'response': [retry_after_hook]}
         else:
             log.fatal('Cannot find API token.')
             sys.exit(1)
@@ -461,7 +468,7 @@ class SparkBackend(ErrBot):
         return 'spark'
 
     def build_self_identitiy(self):
-        resp = requests.get(API_BASE + 'people/me', headers=HEADERS)
+        resp = SESSION.get(API_BASE + 'people/me')
         if resp.status_code != 200:
             process_api_error
         else:
@@ -492,29 +499,29 @@ class SparkBackend(ErrBot):
 
     def get_webhooks(self):
         log.debug('Fetching Webhooks')
-        resp = requests.get(API_BASE + 'webhooks', headers=HEADERS)
+        resp = SESSION.get(API_BASE + 'webhooks')
         if resp.status_code != 200:
             process_api_error(resp)
         data = resp.json()
         return data['items']
 
     def create_webhook(self, url, secret):
+        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'messages',
                 'event': 'created'}
         if secret:
             data['secret'] = secret
-        resp = requests.post(API_BASE + 'webhooks', headers=HEADERS, json=data)
+        resp = SESSION.post(API_BASE + 'webhooks', json=data)
         if resp.status_code != 200:
             process_api_error(resp)
         else:
             return resp.json().get('id')
 
     def delete_webhook(self, webhook_id):
-        resp = requests.delete(API_BASE + 'webhooks/{}'
-                               .format(webhook_id),
-                               headers=HEADERS)
+        resp = SESSION.delete(API_BASE + 'webhooks/{}'
+                              .format(webhook_id))
         if resp.status_code != 204:
             process_api_error(resp)
         self._webhook_id = None
@@ -615,7 +622,7 @@ class SparkBackend(ErrBot):
         else:
             data['roomId'] = to
         log.debug('Sending message with payload: {}'.format(data))
-        resp = requests.post(API_BASE + 'messages', headers=HEADERS, json=data)
+        resp = SESSION.post(API_BASE + 'messages', json=data)
         if resp.status_code == 200:
             return
         else:
@@ -633,8 +640,7 @@ class SparkBackend(ErrBot):
             An instance of :class:`~Message`.
         """
 
-        resp = requests.get(API_BASE + 'messages/{}'
-                            .format(message_id), headers=HEADERS)
+        resp = SESSION.get(API_BASE + 'messages/{}'.format(message_id))
         if resp.status_code != 200:
             process_api_error(resp)
 
@@ -661,7 +667,7 @@ class SparkBackend(ErrBot):
             A list of :class:`~SparkRoom` instances.
         """
 
-        resp = requests.get(API_BASE + 'rooms', headers=HEADERS)
+        resp = SESSION.get(API_BASE + 'rooms')
         if resp.status_code == 200:
             data = get_all_pages(resp)
             rooms = []

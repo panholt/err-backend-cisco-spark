@@ -391,11 +391,11 @@ class SparkRoomList(OrderedDict):
 
     def __missing__(self, key):
         if key.startswith(ROOM_PREFIX):
-            resp = SESSION.get(API_BASE + 'rooms/'.format(key))
+            resp = SESSION.get(API_BASE + 'rooms/{}'.format(key))
             if resp.status_code != 200:
                 process_api_error(resp)
 
-            data = resp.json().get('items').pop()
+            data = resp.json()
             self[key] = SparkRoom(roomId=data['id'],
                                   title=data['title'],
                                   roomType=data['type'],

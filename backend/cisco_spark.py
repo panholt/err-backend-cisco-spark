@@ -5,7 +5,6 @@ import time
 import requests
 import sys
 import re
-import websocket
 
 from collections import OrderedDict
 from time import sleep

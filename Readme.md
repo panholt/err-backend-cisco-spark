@@ -31,10 +31,9 @@ BOT_IDENTITY = {'token' : ''} # Bearer Token belonging to the bot
 
 ```
 
-The BOT_ADMINS key takes the personId string from Cisco Spark
+The BOT_ADMINS key takes the email address associated with the Cisco Spark Account
 ```
-BOT_ADMINS = ('user@email.com',    # Email address of bot admins
-          )
+BOT_ADMINS = ('user@email.com')    # Email address of bot admins
 ```
 
 ## Webserver configuration

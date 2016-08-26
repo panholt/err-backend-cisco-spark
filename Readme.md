@@ -28,16 +28,12 @@ The BOT_IDENTITY needs to be updated to contain the personId, Bearer Token, and 
 Create bot accounts at https://developer.ciscospark.com/add-bot.html
 
 ```
-BOT_IDENTITY = {
-  'id': '',                     #PersonId value from Cisco Spark
-  'token' : '',                 #Bearer Token belonging to the bot
-  'email' : 'bot@sparkbot.io',  #Email address for the bot account
-}
+BOT_IDENTITY = {'token' : ''} # Bearer Token belonging to the bot
 ```
 
 The BOT_ADMINS key takes the personId string from Cisco Spark
 ```
-BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS...',    #PersonId of bot admins
+BOT_ADMINS = ('userid@email.com',    # Email Address of bot admins
           )
 ```
 

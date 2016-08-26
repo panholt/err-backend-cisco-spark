@@ -33,7 +33,7 @@ BOT_IDENTITY = {'token' : ''} # Bearer Token belonging to the bot
 
 The BOT_ADMINS key takes the personId string from Cisco Spark
 ```
-BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS...',    #PersonId of bot admins
+BOT_ADMINS = ('user@email.com',    # Email address of bot admins
           )
 ```
 

@@ -27,11 +27,8 @@ The BOT_IDENTITY needs to be updated to contain the personId, Bearer Token, and 
 Create bot accounts at https://developer.ciscospark.com/add-bot.html
 
 ```
-BOT_IDENTITY = {
-  'id': '',                     #PersonId value from Cisco Spark
-  'token' : '',                 #Bearer Token belonging to the bot
-  'email' : 'bot@sparkbot.io',  #Email address for the bot account
-}
+BOT_IDENTITY = {'token' : ''} # Bearer Token belonging to the bot
+
 ```
 
 The BOT_ADMINS key takes the personId string from Cisco Spark
@@ -57,6 +54,19 @@ WEBHOOK_URL = 'http://some_host.com/incoming'
 ```
 
 The Cisco Spark Backend will automatically create the Webhooks using the Cisco Spark API.
+
+##Extra Configuration Options
+Cisco Spark has a message limit of 7439 characters for the messages API. Errbot should be configured to respect this limit:
+```
+MESSAGE_SIZE_LIMIT = 7439
+```
+
+Cisco Spark Webhooks for bots only trigger in 1:1 rooms with the bot, or if the bot is @mentioned in a group room.
+This backend will automatically register alternate prefixes for the @mention patterns so no additional prefix would be needed.
+For example "@bot status" in a group room would trigger the webhook and the message payload would read "bot status", and an alternate prefix of "bot" is injected to the Errbot configuration.
+
+##ACLs 
+This backend is setup to use the personEmail field for ACL 
 
 ## Contributing
 

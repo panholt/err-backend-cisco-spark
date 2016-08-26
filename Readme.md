@@ -31,10 +31,9 @@ Create bot accounts at https://developer.ciscospark.com/add-bot.html
 BOT_IDENTITY = {'token' : ''} # Bearer Token belonging to the bot
 ```
 
-The BOT_ADMINS key takes the personId string from Cisco Spark
+The BOT_ADMINS key takes the email address associated with the Cisco Spark Account
 ```
-BOT_ADMINS = ('userid@email.com',    # Email Address of bot admins
-          )
+BOT_ADMINS = ('userid@email.com')    # Email Address of bot admins
 ```
 
 ## Websocket Proxy

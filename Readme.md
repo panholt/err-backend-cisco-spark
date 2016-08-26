@@ -44,6 +44,15 @@ BOT_ADMINS = ('Y2lzY29zcGFyazovL3VzL1BFT1BMRS...',    #PersonId of bot admins
 ## Websocket Proxy
 The WEBSOCKET_PROXY key is used to setup the Websocket.
 
+##Extra Configuration Options
+Cisco Spark has a message limit of 7439 characters for the messages API. Errbot should be configured to respect this limit:
+```
+MESSAGE_SIZE_LIMIT = 7439
+```
+
+Cisco Spark Webhooks for bots only trigger in 1:1 rooms with the bot, or if the bot is @mentioned in a group room.
+This backend will automatically register alternate prefixes for the @mention patterns so no additional prefix would be needed.
+For example "@bot status" in a group room would trigger the webhook and the message payload would read "bot status", and an alternate prefix of "bot" is injected to the Errbot configuration.
 
 ## Contributing
 

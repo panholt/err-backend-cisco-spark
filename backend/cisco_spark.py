@@ -162,7 +162,7 @@ class SparkPerson(Person):
     def client(self):
         return ''
 
-    aclattr = person
+    aclattr = personEmail
 
     def get_person_details(self):
         if self._personId:  # Use the protected attrib to avoid recursion
@@ -627,6 +627,42 @@ class SparkBackend(ErrBot):
         else:
             process_api_error(resp)
 
+    def send_card(self, card):
+        '''
+        Implement the send_card functionality for Cisco Spark.
+        Cisco Spark doesn't really support cards or html formatting
+        This is subject to breakage
+        '''
+        color_wheel = {'red': 'danger',
+                       'yellow': 'warning',
+                       'green': 'success',
+                       'teal': 'info'}
+
+        msg = '<blockquote class="{}">'.format(card.color or
+                                               color_wheel.get(card.color, 'info')
+        msg += '<h2>{}</h2>'.format(card.title or '')
+        msg += '{}</br>'.format(card.link)
+        if card.fields:
+            msg += '<ul>'
+            for pair in card.fields:
+                msg += '<li><b>{}:</b> {}</li>'.format(*pair)
+            msg += '</ul>'
+        msg += card.body or ''
+
+        data = {'markdown': msg}
+        if card.to.room.roomType == 'direct':
+            if card.to.personId:
+                data['toPersonId'] = card.to.personId
+            elif '@' in card.to:
+                data['toPersonEmail'] = card.to
+        elif card.to.room.roomType == 'group':
+            data['roomId'] = card.to.room.roomId
+        resp = SESSION.post(API_BASE + 'messages', json=data)
+        if resp.status_code == 200:
+            return
+        else:
+            process_api_error(resp)
+
     def change_presence(self, status, message):
         log.debug('Presence is not implemented by the Spark backend')
         return
@@ -671,7 +707,7 @@ class SparkBackend(ErrBot):
             data = get_all_pages(resp)
             rooms = []
             for room in data:
-                rooms.append(SparkRoom(roomId=room['id'],
+                rooms.append(SparkRoom(roomId=room['id']
                                        title=room['title'],
                                        roomType=room['type'],
                                        isLocked=room['isLocked'],

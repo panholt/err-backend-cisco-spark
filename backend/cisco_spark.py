@@ -21,6 +21,7 @@ log = logging.getLogger('errbot.backends.spark')
 API_BASE = 'https://api.ciscospark.com/v1/'
 PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
 ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
+PERSON_CACHE ={}
 NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)') # Single \n only, not \n\n
 BOT = None
 SESSION = requests.session()
@@ -165,8 +166,18 @@ class SparkPerson(Person):
     aclattr = personEmail
 
     def get_person_details(self):
+        
         if self._personId:  # Use the protected attrib to avoid recursion
-            resp = SESSION.get('{}people/{}'.format(API_BASE, self.personId))
+            log.debug('Cache is: {}'.format(PERSON_CACHE))
+            data = PERSON_CACHE.get(self._personId)
+            if data:
+                self.personId = data['id']
+                self.personDisplayName = data['displayName']
+                self.personEmail = data['emails'][0]
+                return
+            else:
+                resp = SESSION.get('{}people/{}'.format(API_BASE, 
+                                                        self.personId))
         elif self._personEmail:
             resp = SESSION.get(API_BASE + 'people',
                                params={'email': self.personEmail})
@@ -176,10 +187,12 @@ class SparkPerson(Person):
         if resp.status_code == 200:
             data = resp.json()
             if data.get('items'):
-                data = data.get('items').pop()
+                data = data.get('items')[0]
+            PERSON_CACHE[data['id']] = data
             self.personId = data['id']
             self.personDisplayName = data['displayName']
-            self.personEmail = data['emails'].pop()
+            self.personEmail = data['emails'][0]
+
         else:
             process_api_error(resp)
         return
@@ -639,7 +652,7 @@ class SparkBackend(ErrBot):
                        'teal': 'info'}
 
         msg = '<blockquote class="{}">'.format(card.color or
-                                               color_wheel.get(card.color, 'info')
+                                               color_wheel.get(card.color, 'info'))
         msg += '<h2>{}</h2>'.format(card.title or '')
         msg += '{}</br>'.format(card.link)
         if card.fields:
@@ -707,7 +720,7 @@ class SparkBackend(ErrBot):
             data = get_all_pages(resp)
             rooms = []
             for room in data:
-                rooms.append(SparkRoom(roomId=room['id']
+                rooms.append(SparkRoom(roomId=room['id'],
                                        title=room['title'],
                                        roomType=room['type'],
                                        isLocked=room['isLocked'],

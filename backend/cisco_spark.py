@@ -168,7 +168,6 @@ class SparkPerson(Person):
     def get_person_details(self):
         
         if self._personId:  # Use the protected attrib to avoid recursion
-            log.debug('Cache is: {}'.format(PERSON_CACHE))
             data = PERSON_CACHE.get(self._personId)
             if data:
                 self.personId = data['id']

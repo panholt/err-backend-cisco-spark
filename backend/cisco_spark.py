@@ -209,6 +209,7 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
     def __init__(self,
                  room,
                  personId=None,
+                 membershipId=None,
                  personEmail=None,
                  personDisplayName=None,
                  isModerator=None,
@@ -222,12 +223,17 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
                          isMonitor,
                          created)
 
+        self._membershipId = membershipId
         self._room = room
 
     @property
     def room(self):
         return self._room
 
+    @property
+    def membershipId(self):
+        return self._membershipId
+    
 
 class SparkRoom(Room):
     '''
@@ -249,6 +255,7 @@ class SparkRoom(Room):
         self._lastActivity = lastActivity
         self._created = created
         self._teamId = teamId
+        super().__init__()
 
     @property
     def roomId(self):
@@ -324,6 +331,7 @@ class SparkRoom(Room):
         for membership in data:
             _occupants.append(SparkRoomOccupant(
                               room=self,
+                              membershipId=membership['id'],
                               personId=membership['personId'],
                               personEmail=membership['personEmail'],
                               isModerator=membership['isModerator'],
@@ -353,7 +361,10 @@ class SparkRoom(Room):
                       .format(resp.text))
             raise Exception('Unable to add user to room. ' +
                             'Either room is locked or user is already in room')
-        return
+        elif resp.status_code == 200:
+            return
+        else: 
+            process_api_error(resp)
 
     def create(self):
         resp = SESSION.post(API_BASE + 'rooms', json={'title': self.title})
@@ -380,6 +391,17 @@ class SparkRoom(Room):
         elif resp.status_code != 204:  # Member deleted
             process_api_error(resp)
         return
+
+    def kick(self, person):
+        if isinstance(person, SparkRoomOccupant):
+            resp = SESSION.delete(API_BASE + 'memberships/{}'.format(person.membershipId))
+            if resp.status_code == 204:
+                return
+            else:
+                process_api_error(resp)
+        else:
+            return
+
 
     def join(self):
         raise NotImplemented('Cannot join rooms. Must be added instead')
@@ -518,6 +540,7 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
+        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'messages',
@@ -608,6 +631,24 @@ class SparkBackend(ErrBot):
                              teamId=None
                              )
             return room
+
+    def get_team_rooms(self, teamId):
+        log.debug('Fetching team rooms for team: {}'.format(teamId))
+        resp = SESSION.get(API_BASE + 'rooms', params={'teamId': teamId})
+        log.debug('Got Response: {} Body: {}'.format(resp.status_code, resp.text))
+        if resp.status_code == 200:
+            data = get_all_pages(resp)
+            return [SparkRoom(roomId=room['id'],
+                                     title=room['title'],
+                                     roomType=room['type'],
+                                     isLocked=room['isLocked'],
+                                     lastActivity=room['lastActivity'],
+                                     created=room['created'],
+                                     teamId=room.get('teamId'))
+                    for room in data]
+        else:
+            process_api_error(resp)
+        return
 
     def build_reply(self, message, text=None, direct=False):
         response = self.build_message(text)

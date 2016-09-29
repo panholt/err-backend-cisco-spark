@@ -440,6 +440,14 @@ class SparkRoomList(OrderedDict):
                                   )
             return self[key]
 
+class SparkMessage(Message):
+    @property
+    def is_direct(self):
+        return self.to.roomType == 'direct'
+
+    @property
+    def is_group(self) -> bool:
+        return self.to.roomType == 'group'
 
 class SparkBackend(ErrBot):
     '''
@@ -509,7 +517,7 @@ class SparkBackend(ErrBot):
             data = resp.json()
             return SparkPerson(personId=data['id'],
                                personDisplayName=data['displayName'],
-                               personEmail=data['emails'].pop())
+                               personEmail=data['emails'][0])
 
     def build_alt_prefixes(self):
         words = self.bot_identifier.personDisplayName.split(' ')
@@ -543,8 +551,8 @@ class SparkBackend(ErrBot):
         url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
-                'resource': 'messages',
-                'event': 'created'}
+                'resource': 'all',
+                'event': 'all'}
         if secret:
             data['secret'] = secret
         resp = SESSION.post(API_BASE + 'webhooks', json=data)
@@ -582,12 +590,19 @@ class SparkBackend(ErrBot):
 
         elif event.get('data'):
             log.debug('Received event: {}'.format(event.get('data')))
-            if event['data']['data']['personId'] != self.bot_identifier:
-                # don't bother processing messages from the bot.
-                message = self.decrypt_message(event['data']['data']['id'])
-                self.callback_message(message)
+            resource = event['data'].get('resource', 'None')
+            if resource == 'messages':
+                self.spark_message_callback(event['data'])
+            elif resource == 'memberships':
+                self.spark_memberships_callback(event['data'])
+            elif resource == 'rooms':
+                self.spark_rooms_callback(event['data'])
+            elif resource == 'teams':
+                self.spark_teams_callback(event['data'])
+            else:
+                log.debug('Unknown event type received: {}'.format(resource))
         else:
-            log.debug('Unknown event type received: {}'.format(event))
+            log.debug('Unknown event received over websocket: {}'.format(event))
         return
 
     def ws_error_callback(self, ws, error):
@@ -598,6 +613,25 @@ class SparkBackend(ErrBot):
     def ws_close_callback(self, ws):
         if self.webhook_id:
             self.delete_webhook(self.webhook_id)
+        return
+
+    def spark_message_callback(self, event):
+        if event['data']['personId'] != self.bot_identifier:
+                # don't bother processing messages from the bot.
+                message = self.decrypt_message(event['data']['id'])
+                self.callback_message(message)
+        return
+
+    def spark_memberships_callback(self, event):
+        log.debug('Membership event received')
+        return
+
+    def spark_rooms_callback(self, event):
+        log.debug('Room event received')
+        return
+
+    def spark_teams_callback(self, event):
+        log.debug('Team event received')
         return
 
     def build_identifier(self, text_representation, room_id=False):
@@ -703,13 +737,7 @@ class SparkBackend(ErrBot):
         msg += card.body or ''
 
         data = {'markdown': msg}
-        if card.to.room.roomType == 'direct':
-            if card.to.personId:
-                data['toPersonId'] = card.to.personId
-            elif '@' in card.to:
-                data['toPersonEmail'] = card.to
-        elif card.to.room.roomType == 'group':
-            data['roomId'] = card.to.room.roomId
+        data['roomId'] = card.to.room.roomId
         resp = SESSION.post(API_BASE + 'messages', json=data)
         if resp.status_code == 200:
             return
@@ -735,16 +763,11 @@ class SparkBackend(ErrBot):
         data = resp.json()
         text = data.get('text', '')
 
-        message = Message(text)
+        message = SparkMessage(text)
         message.frm = self.build_identifier(data.get('personId'),
                                             room_id=data.get('roomId'))
         room = self.query_room(data.get('roomId'))
-
-        if room.roomType == 'group':
-            message.to = self.build_identifier(room.roomId)
-        elif room.roomType == 'direct':
-            message.to = self.build_identifier(self.bot_identifier.personId,
-                                               room_id=room.roomId)
+        message.to = self.build_identifier(room.roomId)
         return message
 
     def rooms(self):

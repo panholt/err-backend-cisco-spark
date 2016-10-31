@@ -431,7 +431,7 @@ class SparkRoomList(OrderedDict):
 
             data = resp.json()
             self[key] = SparkRoom(roomId=data['id'],
-                                  title=data['title'],
+                                  title=data.get('title', ''),
                                   roomType=data['type'],
                                   isLocked=data['isLocked'],
                                   lastActivity=data['lastActivity'],
@@ -673,7 +673,7 @@ class SparkBackend(ErrBot):
         if resp.status_code == 200:
             data = get_all_pages(resp)
             return [SparkRoom(roomId=room['id'],
-                                     title=room['title'],
+                                     title=room.get('title', ''),
                                      roomType=room['type'],
                                      isLocked=room['isLocked'],
                                      lastActivity=room['lastActivity'],
@@ -784,7 +784,7 @@ class SparkBackend(ErrBot):
             rooms = []
             for room in data:
                 rooms.append(SparkRoom(roomId=room['id'],
-                                       title=room['title'],
+                                       title=data.get('title', ''),
                                        roomType=room['type'],
                                        isLocked=room['isLocked'],
                                        lastActivity=room['lastActivity'],

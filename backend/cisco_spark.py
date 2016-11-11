@@ -547,7 +547,7 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
-        url = url.replace('12345', '8443')
+        # url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'all',

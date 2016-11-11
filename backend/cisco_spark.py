@@ -55,10 +55,10 @@ def retry_after_hook(resp, *args, **kwargs):
         return
 
 def process_api_error(resp):
-    log.debug('Recevied a: {} response from Cisco Spark'
+    log.debug('Received a: {} response from Cisco Spark'
               .format(resp.status_code))
     log.debug('Error details: {}'.format(resp.text))
-    raise Exception('Recevied a: {} response from Cisco Spark'
+    raise Exception('Received a: {} response from Cisco Spark'
                     .format(resp.status_code))
 
 
@@ -470,8 +470,7 @@ class SparkBackend(ErrBot):
         self._webhook_id = None
         self._webhook_url = None
         self._webhook_secret = None
-        self._rooms = SparkRoomList([(room.roomId, room)
-                                    for room in self.rooms()])
+        self._rooms = SparkRoomList()
         self.ws = websocket.WebSocketApp(config.WEBSOCKET_PROXY,
                                          on_message=self.ws_message_callback,
                                          on_error=self.ws_error_callback,
@@ -548,6 +547,7 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
+        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'all',
@@ -783,7 +783,7 @@ class SparkBackend(ErrBot):
             rooms = []
             for room in data:
                 rooms.append(SparkRoom(roomId=room['id'],
-                                       title=data.get('title', ''),
+                                       title=room.get('title', ''),
                                        roomType=room['type'],
                                        isLocked=room['isLocked'],
                                        lastActivity=room['lastActivity'],

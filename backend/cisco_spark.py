@@ -367,10 +367,7 @@ class SparkRoom(Room):
             process_api_error(resp)
 
     def create(self):
-        resp = SESSION.post(API_BASE + 'rooms', json={'title': self.title})
-        data = resp.json()
-        self.roomId = data['id']
-        return
+        pass 
 
     def leave(self):
         log.debug('Leaving room: {} with membership: {}'
@@ -802,6 +799,25 @@ class SparkBackend(ErrBot):
         else:
             process_api_error(resp)
         return
+
+    def create_room_with_particpants(self, title, particpants):
+        resp = SESSION.post(API_BASE + 'rooms', json={'title': title})
+        data = resp.json()
+        
+        room = SparkRoom(roomId=data['id'],
+                         title=data.get('title', ''),
+                         roomType=data['type'],
+                         isLocked=data['isLocked'],
+                         lastActivity=data['lastActivity'],
+                         created=data['created'],
+                         teamId=data.get('teamId')
+                         )
+        if instance(particpants, list):
+            for particpant in particpants:
+                room.invite(particpant)
+        else:
+            room.invite(particpant)
+        return room
 
     def serve_forever(self):
         log.debug('Entering serve forever')

@@ -547,7 +547,7 @@ class SparkBackend(ErrBot):
         return data['items']
 
     def create_webhook(self, url, secret):
-        # url = url.replace('12345', '8443')
+        url = url.replace('12345', '8443')
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'all',
@@ -570,6 +570,13 @@ class SparkBackend(ErrBot):
         self._webhook_secret = None
         return
 
+    def clear_webhooks(self):
+        for hook in self.get_webhooks():
+            if hook['name'] == 'Spark Errbot Webhook':
+                log.debug('Deleting Webhook: {}'.format(hook))
+                self.delete_webhook(hook['id'])
+        return
+
     def ws_message_callback(self, ws, message):
         try:
             event = json.loads(message)
@@ -578,11 +585,9 @@ class SparkBackend(ErrBot):
             return
         if event.get('url'):
             # First event received, should be our webhook url
-            log.debug('Received url event: {}'.format(event))
-            if self._webhook_url and self.webhook_id:
-                log.debug('Received a new webhook url ' +
-                          'but one already exists. Deleting existing')
-                self.delete_webhook(self.webhook_id)
+            log.debug('Received new Webhook information event: {}'.format(event))
+            log.debug('Clearing old webhooks')
+            self.clear_webhooks()
             self.webhook_url = event.get('url')
             self.webhook_secret = event.get('secret')
             self.webhook_id = self.create_webhook(self.webhook_url, self.webhook_secret)

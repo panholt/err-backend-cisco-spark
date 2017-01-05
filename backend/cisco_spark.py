@@ -471,7 +471,7 @@ class SparkBackend(ErrBot):
                    for hook in self.get_webhooks())):
             log.debug('No Webhook found matching targetUrl: {}'
                       .format(self.webhook_url))
-            self.create_webhook()
+            self.create_webhook(self.webhook_url)
         global BOT
         BOT = self
 
@@ -542,7 +542,8 @@ class SparkBackend(ErrBot):
         data = resp.json()
         return data['items']
 
-    def create_webhook(self, url, secret):
+    def create_webhook(self, url, secret=False):
+        # TODO implement secret checking at plugin
         data = {'name': 'Spark Errbot Webhook',
                 'targetUrl': url,
                 'resource': 'all',

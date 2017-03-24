@@ -45,7 +45,7 @@ def retry_after_hook(resp, *args, **kwargs):
     Will sleep for the proper interval and then retry
     '''
     if resp.status_code == 429:
-        sleepy_time = int(r.headers.get('Retry-After', 15))
+        sleepy_time = int(resp.headers.get('Retry-After', 15))
         log.debug('Received 429 Response. Sleeping for: {} secs'
                   .format(sleepy_time))
         sleep(sleepy_time)
@@ -440,7 +440,8 @@ class SparkMessage(Message):
         return self.to.roomType == 'direct'
 
     @property
-    def is_group(self) -> bool:
+    def is_group(self):
+        log.debug('message.is_group accessed. Message is: {}'.format(message.to.roomType))
         return self.to.roomType == 'group'
 
 class SparkBackend(ErrBot):
@@ -464,8 +465,8 @@ class SparkBackend(ErrBot):
         self.md = md()
         self._rooms = SparkRoomList()
         self.build_alt_prefixes()
-        self._rooms = SparkRoomList([(room.roomId, room)
-                                    for room in self.rooms()])
+        # self._rooms = SparkRoomList([(room.roomId, room)
+        #                             for room in self.rooms()])
 
         if not any((hook['targetUrl'] == self.webhook_url
                    for hook in self.get_webhooks())):
@@ -612,18 +613,21 @@ class SparkBackend(ErrBot):
 
     def query_room(self, roomId):
         if roomId.startswith(ROOM_PREFIX):
+            log.debug('Returning: {}'.format(self._rooms[roomId]))
             return self._rooms[roomId]
-        # The core plugin for create room expects a room object back
         else:
-            room = SparkRoom(roomId=None,
-                             title=roomId,
-                             roomType='group',
-                             isLocked=False,
-                             lastActivity=None,
-                             created=None,
-                             teamId=None
-                             )
-            return room
+            raise ValueError('Query Room called with: {}. Does not match the prefix: {}'.format(roomId, ROOM_PREFIX))
+        # The core plugin for create room expects a room object back
+        # else:
+        #     room = SparkRoom(roomId=None,
+        #                      title=roomId,
+        #                      roomType='group',
+        #                      isLocked=False,
+        #                      lastActivity=None,
+        #                      created=None,
+        #                      teamId=None
+        #                      )
+        #     return room
 
     def get_team_rooms(self, teamId):
         log.debug('Fetching team rooms for team: {}'.format(teamId))
@@ -776,6 +780,30 @@ class SparkBackend(ErrBot):
         else:
             room.invite(particpant)
         return room
+
+    def create_one_on_one_room(self, person, message):
+        '''
+        Sends a 1:1 Message to a user and returns a SparkRoom Object
+        '''
+        data = {'markdown': message}
+        if person.startswith(PERSON_PREFIX):
+            data['toPersonId'] = person
+        elif '@' in person:
+            data['toPersonEmail'] = person
+        else:
+            raise ValueError('Invalid Person Identifier: {}'.format(person))
+        
+        log.debug('Preparing to send message with body: {}'.format(data))
+        resp = SESSION.post(API_BASE + 'messages', json=data)
+        if resp.status_code == 200:
+            _data = resp.json()
+            log.debug('Response payload is: {}'.format(_data))
+            return self._rooms[_data['roomId']]
+        else:
+            log.debug('Received error response: {} {}'.format(resp.status_code, resp.text))
+            raise Exception('Error sending message to {}. Error: {}'.format(person, resp.status_code))
+            return
+
 
     def serve_forever(self):
         log.debug('Entering serve forever')

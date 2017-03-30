@@ -441,7 +441,6 @@ class SparkMessage(Message):
 
     @property
     def is_group(self):
-        log.debug('message.is_group accessed. Message is: {}'.format(message.to.roomType))
         return self.to.roomType == 'group'
 
 class SparkBackend(ErrBot):
@@ -726,7 +725,7 @@ class SparkBackend(ErrBot):
         data = resp.json()
         text = data.get('text', '')
 
-        message = Message(text)
+        message = SparkMessage(text)
         message.frm = self.build_identifier(data.get('personId'),
                                             room_id=data.get('roomId'))
         room = self.query_room(data.get('roomId'))

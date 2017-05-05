@@ -46,7 +46,7 @@ def retry_after_hook(resp, *args, **kwargs):
     Will sleep for the proper interval and then retry
     '''
     if resp.status_code == 429:
-        sleepy_time = int(r.headers.get('Retry-After', 15))
+        sleepy_time = int(resp.headers.get('Retry-After', 15))
         log.debug('Received 429 Response. Sleeping for: {} secs'
                   .format(sleepy_time))
         sleep(sleepy_time)
@@ -421,7 +421,7 @@ class SparkRoomList(OrderedDict):
     '''
 
     def __missing__(self, key):
-        if key.startswith(ROOM_PREFIX):
+        if key and key.startswith(ROOM_PREFIX):
             resp = SESSION.get(API_BASE + 'rooms/{}'.format(key))
             if resp.status_code != 200:
                 process_api_error(resp)
@@ -654,18 +654,21 @@ class SparkBackend(ErrBot):
 
     def query_room(self, roomId):
         if roomId.startswith(ROOM_PREFIX):
+            log.debug('Returning: {}'.format(self._rooms[roomId]))
             return self._rooms[roomId]
-        # The core plugin for create room expects a room object back
         else:
-            room = SparkRoom(roomId=None,
-                             title=roomId,
-                             roomType='group',
-                             isLocked=False,
-                             lastActivity=None,
-                             created=None,
-                             teamId=None
-                             )
-            return room
+            raise ValueError('Query Room called with: {}. Does not match the prefix: {}'.format(roomId, ROOM_PREFIX))
+        # The core plugin for create room expects a room object back
+        # else:
+        #     room = SparkRoom(roomId=None,
+        #                      title=roomId,
+        #                      roomType='group',
+        #                      isLocked=False,
+        #                      lastActivity=None,
+        #                      created=None,
+        #                      teamId=None
+        #                      )
+        #     return room
 
     def get_team_rooms(self, teamId):
         log.debug('Fetching team rooms for team: {}'.format(teamId))

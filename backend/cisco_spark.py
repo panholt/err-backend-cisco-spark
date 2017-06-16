@@ -425,6 +425,7 @@ class SparkRoomList(OrderedDict):
             resp = SESSION.get(API_BASE + 'rooms/{}'.format(key))
             if resp.status_code != 200:
                 process_api_error(resp)
+                raise KeyError('{} Is not a valid room ID')
 
             data = resp.json()
             self[key] = SparkRoom(roomId=data['id'],
@@ -629,7 +630,22 @@ class SparkBackend(ErrBot):
 
     def spark_rooms_callback(self, event):
         log.debug('Room event received')
-        return
+        if event['event'] == 'updated':
+            # Room has been updated, clear the cache
+            if event['data']['id'] in self._rooms:
+                del(self._rooms[event['data']['id']])
+                # refresh 
+                try:
+                    self._rooms[event['data']['id']]
+                except KeyError:
+                    pass
+        elif event['event'] == 'updated':
+            # new room, update the cache
+            try:
+                self._rooms[event['data']['id']]
+            except KeyError:
+                pass
+        return 
 
     def spark_teams_callback(self, event):
         log.debug('Team event received')
@@ -672,7 +688,7 @@ class SparkBackend(ErrBot):
 
     def get_team_rooms(self, teamId):
         log.debug('Fetching team rooms for team: {}'.format(teamId))
-        resp = SESSION.get(API_BASE + 'rooms', params={'teamId': teamId})
+        resp = SESSION.get(API_BASE + 'rooms', params={'teamId': teamId, 'sortBy': 'id'})
         log.debug('Got Response: {} Body: {}'.format(resp.status_code, resp.text))
         if resp.status_code == 200:
             data = get_all_pages(resp)

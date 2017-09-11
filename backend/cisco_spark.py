@@ -173,7 +173,7 @@ class SparkPerson(Person):
                 self.personEmail = data['emails'][0]
                 return
             else:
-                resp = SESSION.get('{}people/{}'.format(API_BASE, 
+                resp = SESSION.get('{}people/{}'.format(API_BASE,
                                                         self.personId))
         elif self._personEmail:
             resp = SESSION.get(API_BASE + 'people',
@@ -230,7 +230,7 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
     @property
     def membershipId(self):
         return self._membershipId
-    
+
 
 class SparkRoom(Room):
     '''
@@ -360,11 +360,11 @@ class SparkRoom(Room):
                             'Either room is locked or user is already in room')
         elif resp.status_code == 200:
             return
-        else: 
+        else:
             process_api_error(resp)
 
     def create(self):
-        pass 
+        pass
 
     def leave(self):
         log.debug('Leaving room: {} with membership: {}'
@@ -646,14 +646,14 @@ class SparkBackend(ErrBot):
             process_api_error(resp)
         return
 
-    def build_reply(self, message, text=None, direct=False):
+    def build_reply(self, msg, text=None, private=False, threaded=False):
         response = self.build_message(text)
         response.frm = self.bot_identifier
         # Errbot needs to know if a message is direct or in a room
-        if message.is_group:
-            response.to = message.frm.room
+        if msg.is_group:
+            response.to = msg.frm.room
         else:
-            response.to = message.frm
+            response.to = msg.frm
         return response
 
     def send_message(self, message, files=None):
@@ -764,7 +764,7 @@ class SparkBackend(ErrBot):
     def create_room_with_particpants(self, title, particpants):
         resp = SESSION.post(API_BASE + 'rooms', json={'title': title})
         data = resp.json()
-        
+
         room = SparkRoom(roomId=data['id'],
                          title=data.get('title', ''),
                          roomType=data['type'],
@@ -791,7 +791,7 @@ class SparkBackend(ErrBot):
             data['toPersonEmail'] = person
         else:
             raise ValueError('Invalid Person Identifier: {}'.format(person))
-        
+
         log.debug('Preparing to send message with body: {}'.format(data))
         resp = SESSION.post(API_BASE + 'messages', json=data)
         if resp.status_code == 200:

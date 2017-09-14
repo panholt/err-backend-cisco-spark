@@ -1,229 +1,73 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
-import time
-import requests
 import sys
 import re
 import websocket
 
-from collections import OrderedDict
-from time import sleep
-
-from errbot.errBot import ErrBot
+from errbot.core import ErrBot
+# from errbot.backends.base import Message, Presence, ONLINE, AWAY, Room, \
+# RoomError, RoomDoesNotExistError, UserDoesNotExistError, RoomOccupant, \
+# Person, Card, Stream
 from errbot.backends.base import Message, Person, Room, RoomOccupant
 from errbot.rendering import md
+
+import sparkpy
 
 # Can't use __name__ because of Yapsy
 log = logging.getLogger('errbot.backends.spark')
 
 # Constants
-API_BASE = 'https://api.ciscospark.com/v1/'
-PERSON_PREFIX = 'Y2lzY29zcGFyazovL3VzL1BFT1BMRS'
-ROOM_PREFIX = 'Y2lzY29zcGFyazovL3VzL1JPT00'
-PERSON_CACHE ={}
-NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)') # Single \n only, not \n\n
-BOT = None
-SESSION = requests.session()
+NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)')  # Single \n only, not \n\n
 
-def get_membership_by_room(roomId):
-    resp = SESSION.get(API_BASE + 'memberships',
-                       params={'roomId': roomId,
-                               'personId': BOT.bot_identifier.personId})
-    if resp.status_code == 200:
-        try:
-            return resp.json()['items'][0]['id']
-        except:
-            log.debug('Error occured getting membership. Details: {}'
-                      .format(resp.text))
-    else:
-        process_api_error(resp)
-    return
-
-def retry_after_hook(resp, *args, **kwargs):
-    '''
-    Requests request hook. Looks for a 429 response
-    Will sleep for the proper interval and then retry
-    '''
-    if resp.status_code == 429:
-        sleepy_time = int(resp.headers.get('Retry-After', 15))
-        log.debug('Received 429 Response. Sleeping for: {} secs'
-                  .format(sleepy_time))
-        sleep(sleepy_time)
-        return SESSION.send(resp.request)
-    else:
-        return
-
-def process_api_error(resp):
-    log.debug('Received a: {} response from Cisco Spark'
-              .format(resp.status_code))
-    log.debug('Error details: {}'.format(resp.text))
-    raise Exception('Received a: {} response from Cisco Spark'
-                    .format(resp.status_code))
-
-
-def get_all_pages(resp):
-    '''
-    Takes a response object and returns a list of all items across all pages
-    '''
-    data = resp.json()['items']
-    while resp.links.get('next'):
-        resp = SESSION.get(resp.links['next']['url'])
-        if resp.status_code != 200:
-            process_api_error(resp)
-        data += resp.json().get('items', [])
-    return data
 
 class SparkPerson(Person):
     '''
-    This class represents a Spark User
+    This class represents a Person in Cisco Spark. This is a wrapper over
+    sparkpy.models.people.SparkPerson
     '''
 
-    def __init__(self,
-                 personId=None,
-                 personEmail=None,
-                 personDisplayName=None,
-                 isModerator=None,
-                 isMonitor=None,
-                 created=None):
-
-        if not any((personId, personEmail)):
-            raise Exception('SparkPerson needs either an id or email address')
-
-        if personId is not None and not personId.startswith(PERSON_PREFIX):
-            raise Exception('Invalid Spark Person ID: {}'.format(personId))
-        elif personEmail is not None and '@' not in personEmail:
-            raise Exception('Invalid Spark Person Email address {}'
-                            .format(personEmail))
-
-        self._personId = personId
-        self._personEmail = personEmail
-        self._personDisplayName = personDisplayName
-        self._isModerator = isModerator
-        self._isMonitor = isMonitor
-
-    @property
-    def personId(self):
-        if self._personId is None:
-            self.get_person_details()
-        return self._personId
-
-    @personId.setter
-    def personId(self, value):
-        if not value.startswith(PERSON_PREFIX):
-            raise ValueError('Valid Spark Person ID required')
-        self._personId = value
-        return
-
-    @property
-    def personEmail(self):
-        if self._personEmail is None:
-            self.get_person_details()
-        return self._personEmail
-
-    @personEmail.setter
-    def personEmail(self, value):
-        if '@' not in value:
-            raise ValueError('Valid Email Address is required')
+    def __init__(self, person):
+        if isinstance(person, sparkpy.models.SparkPerson):
+            self._person = person
+        elif sparkpy.utils.is_api_id(person, 'people'):
+            self._person = sparkpy.SparkPerson(person)
         else:
-            self._personEmail = value
-
-    @property
-    def personDisplayName(self):
-        if self._personDisplayName is None:
-            self.get_person_details()
-        return self._personDisplayName
-
-    @personDisplayName.setter
-    def personDisplayName(self, value):
-        self._personDisplayName = value
-        return
+            raise TypeError('SparkPerson requires an id or sparkpy Person')
 
     @property
     def person(self):
-        return self.personId
-
-    @property
-    def nick(self):
-        return self.personEmail
-
-    @property
-    def isMonitor(self):
-        return self._isMonitor
-
-    @property
-    def isModerator(self):
-        return self._isModerator
-
-    @property
-    def fullname(self):
-        return self._personDisplayName
+        return self._person._id
 
     @property
     def client(self):
-        return ''
+        return 'Cisco Spark'
 
-    aclattr = personEmail
+    @property
+    def nick(self):
+        return self._person.emails[0]
 
-    def get_person_details(self):
-        
-        if self._personId:  # Use the protected attrib to avoid recursion
-            data = PERSON_CACHE.get(self._personId)
-            if data:
-                self.personId = data['id']
-                self.personDisplayName = data['displayName']
-                self.personEmail = data['emails'][0]
-                return
-            else:
-                resp = SESSION.get('{}people/{}'.format(API_BASE, 
-                                                        self.personId))
-        elif self._personEmail:
-            resp = SESSION.get(API_BASE + 'people',
-                               params={'email': self.personEmail})
-        elif self._personDisplayName:
-            resp = SESSION.get(API_BASE + 'people',
-                               params={'displayName': self.personDisplayName})
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get('items'):
-                data = data.get('items')[0]
-            PERSON_CACHE[data['id']] = data
-            self.personId = data['id']
-            self.personDisplayName = data['displayName']
-            self.personEmail = data['emails'][0]
+    @property
+    def aclattr(self):
+        return self.nick
 
-        else:
-            process_api_error(resp)
-        return
+    @property
+    def fullname(self):
+        return self._person.displayName
 
-    def __eq__(self, other):
-        return str(self) == str(other)
+    def __getattr__(self, attr):
+        return getattr(self._person, attr)
 
-    def __unicode__(self):
-        return self.personId
-
-    __str__ = __unicode__
+    def __repr__(self):
+        return '<SparkPerson("{}")>'.format(self.person)
 
 
 class SparkRoomOccupant(SparkPerson, RoomOccupant):
-    def __init__(self,
-                 room,
-                 personId=None,
-                 membershipId=None,
-                 personEmail=None,
-                 personDisplayName=None,
-                 isModerator=None,
-                 isMonitor=None,
-                 created=None):
-
-        super().__init__(personId,
-                         personEmail,
-                         personDisplayName,
-                         isModerator,
-                         isMonitor,
-                         created)
-
-        self._membershipId = membershipId
+    '''
+    This object represents a member in a Spark Room
+    '''
+    def __init__(self, person, room):
+        self._person = person
         self._room = room
 
     @property
@@ -231,212 +75,12 @@ class SparkRoomOccupant(SparkPerson, RoomOccupant):
         return self._room
 
     @property
-    def membershipId(self):
-        return self._membershipId
-    
+    def person(self):
+        return self._person
 
-class SparkRoom(Room):
-    '''
-    This class represents a Spark room
-    '''
-    def __init__(self,
-                 roomId,
-                 title,
-                 roomType,
-                 isLocked,
-                 lastActivity,
-                 created,
-                 teamId=None):
+    def __repr__(self):
+        return '<SparkRoomOccupant({}/{})'.format(self.room, self.person)
 
-        self._roomId = roomId
-        self._title = title
-        self._roomType = roomType
-        self._isLocked = isLocked
-        self._lastActivity = lastActivity
-        self._created = created
-        self._teamId = teamId
-        super().__init__()
-
-    @property
-    def roomId(self):
-        return self._roomId
-
-    @roomId.setter
-    def roomId(self, value):
-        if value.startswith(ROOM_PREFIX):
-            self._roomId = value
-        else:
-            raise ValueError('Invalid Room ID Provided')
-
-    @property
-    def title(self):
-        return self._title
-
-    @title.setter
-    def title(self, value):
-        if self.roomType == 'direct':
-            raise ValueError('Cannot change the title of a direct room')
-        else:
-            resp = SESSION.put(API_BASE + 'rooms/{}'.format(self.roomId),
-                               json={'title': value})
-            if resp.status_code == 200:
-                self._title = value
-                return
-            elif resp.status_code == 409:
-                # Policy response. Room is moderated
-                raise AttributeError('Cannot change the title of locked room')
-            else:
-                process_api_error(resp)
-                return
-
-    @property
-    def isLocked(self):
-        return self._isLocked
-
-    @property
-    def lastActivity(self):
-        return self._lastActivity
-
-    @property
-    def roomType(self):
-        return self._roomType
-
-    @property
-    def created(self):
-        return self._created
-
-    @property
-    def teamId(self):
-        return self._teamId
-
-    @property
-    def topic(self):
-        return self._title
-
-    @topic.setter
-    def topic(self, value):
-        self.title = value
-        return
-
-    @property
-    def occupants(self):
-        _occupants = []
-        resp = SESSION.get('https://api.ciscospark.com/v1/memberships',
-                           params={'roomId': self.roomId})
-        if resp.status_code != 200:
-            process_api_error(resp)
-
-        data = get_all_pages(resp)
-
-        for membership in data:
-            _occupants.append(SparkRoomOccupant(
-                              room=self,
-                              membershipId=membership['id'],
-                              personId=membership['personId'],
-                              personEmail=membership['personEmail'],
-                              isModerator=membership['isModerator'],
-                              isMonitor=membership['isMonitor'],
-                              created=membership['created'],
-                              personDisplayName=membership['personDisplayName']
-                              ))
-        return _occupants
-
-    def invite(self, person):
-        if self.roomType == 'direct':
-            raise Exception('Cannot add a person to a 1:1 room')
-        data = {'roomId': self.roomId}
-        if person.startswith(PERSON_PREFIX):
-            data['personId'] = person
-        elif '@' in person:
-            data['personEmail'] = person
-        else:
-            raise Exception('Invalid Identifier: "{}" ' +
-                            'Must be an email address or Spark personId'
-                            .format(person))
-
-        resp = SESSION.post(API_BASE + 'memberships',
-                            json=data)
-        if resp.status_code == 409:
-            log.debug('Received 409 Response adding user to room. Body: {}'
-                      .format(resp.text))
-            raise Exception('Unable to add user to room. ' +
-                            'Either room is locked or user is already in room')
-        elif resp.status_code == 200:
-            return
-        else: 
-            process_api_error(resp)
-
-    def create(self):
-        pass 
-
-    def leave(self):
-        log.debug('Leaving room: {} with membership: {}'
-                  .format(self.roomId, get_membership_by_room(self.roomId)))
-
-        resp = SESSION.delete(API_BASE + 'memberships/{}'
-                              .format(get_membership_by_room(self.roomId)))
-        if resp.status_code == 409:
-            raise Exception('Unable to leave moderated room')
-        elif resp.status_code != 204:
-            process_api_error(resp)
-        return
-
-    def destroy(self):
-        resp = SESSION.delete(API_BASE + 'rooms/{}'.format(self.roomId))
-        if resp.status_code == 409:
-            raise Exception('Unable to delete moderated room')
-        elif resp.status_code != 204:  # Member deleted
-            process_api_error(resp)
-        return
-
-    def kick(self, person):
-        if isinstance(person, SparkRoomOccupant):
-            resp = SESSION.delete(API_BASE + 'memberships/{}'.format(person.membershipId))
-            if resp.status_code == 204:
-                return
-            else:
-                process_api_error(resp)
-        else:
-            return
-
-
-    def join(self):
-        raise NotImplemented('Cannot join rooms. Must be added instead')
-
-    def __eq__(self, other):
-        return self.roomId == other
-
-    def __hash__(self):
-        return hash(self.roomId)
-
-    def __unicode__(self):
-        return self.roomId
-
-    __str__ = __unicode__
-
-
-class SparkRoomList(OrderedDict):
-    '''
-    subclassed dict to fetch missing rooms
-    '''
-
-    def __missing__(self, key):
-        if key and key.startswith(ROOM_PREFIX):
-            resp = SESSION.get(API_BASE + 'rooms/{}'.format(key))
-            if resp.status_code != 200:
-                process_api_error(resp)
-                raise KeyError('{} Is not a valid room ID')
-
-            data = resp.json()
-            self[key] = SparkRoom(roomId=data['id'],
-                                  title=data.get('title', ''),
-                                  roomType=data['type'],
-                                  isLocked=data['isLocked'],
-                                  lastActivity=data['lastActivity'],
-                                  created=data['created'],
-                                  teamId=data.get('teamId')  # May not exist
-                                  )
-            return self[key]
 
 class SparkMessage(Message):
     @property
@@ -444,8 +88,9 @@ class SparkMessage(Message):
         return self.to.roomType == 'direct'
 
     @property
-    def is_group(self) -> bool:
+    def is_group(self):
         return self.to.roomType == 'group'
+
 
 class SparkBackend(ErrBot):
     '''

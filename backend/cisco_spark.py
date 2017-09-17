@@ -4,9 +4,6 @@ import logging
 import re
 
 from errbot.core import ErrBot
-# from errbot.backends.base import Message, Presence, ONLINE, AWAY, Room, \
-# RoomError, RoomDoesNotExistError, UserDoesNotExistError, RoomOccupant, \
-# Person, Card, Stream
 from errbot.backends.base import Message, Person, Room, RoomOccupant
 from errbot.rendering import md
 import websocket
@@ -223,6 +220,29 @@ class ErrSparkBackend(ErrBot):
         message.to = self.build_identifier(msg.roomId)
         return message
 
+    def send_card(self, card):
+        '''
+        Implement the send_card functionality for Cisco Spark.
+        Cisco Spark doesn't really support cards or html formatting
+        This is subject to breakage
+        '''
+        # colors = {'red': 'danger',
+        #           'yellow': 'warning',
+        #           'green': 'success',
+        #           'teal': 'info'}
+
+        msg = '<blockquote class="{color}">'.format(color=card.color)
+        msg += '<h2>{title}</h2>'.format(title=card.title)
+        msg += '{link}</br>'.format(card.link)
+        if card.fields:
+            msg += '<ul>'
+            for pair in card.fields:
+                msg += '<li><b>{key}:</b> {value}</li>'.format(key=pair[0],
+                                                               value=pair[1])
+            msg += '</ul>'
+        msg += '{body}</blockquote>card.body'.format(card.body)
+        self.spark.send_message(msg, room_id=card.to.id)
+
     def build_reply(self, msg, text=None, private=False, threaded=False):
         reply = self.build_message(text)
         reply.frm = self.bot_identifier
@@ -260,7 +280,7 @@ class ErrSparkBackend(ErrBot):
         try:
             event = json.loads(message)
         except ValueError:
-            log.error('Invalid json received from websocket: {}'.format(event))
+            log.error('Invalid json received from websocket: %s', event)
             return
         if event.get('url'):
             # First event received, should be our webhook url
@@ -271,7 +291,8 @@ class ErrSparkBackend(ErrBot):
                                       'all', 'all',
                                       secret=webhook_secret)
         elif event.get('data'):
-            log.debug('Received event: {}'.format(event.get('data')))
+            data = event.get('data')
+            log.debug('Received event: %s', data)
             resource = event['data'].get('resource', 'None')
             if resource == 'messages':
                 self.message_callback(event['data']['data'])
@@ -282,9 +303,9 @@ class ErrSparkBackend(ErrBot):
             # elif resource == 'teams':
             #     self.spark_teams_callback(event['data'])
             else:
-                log.debug('Unknown event type received: {}'.format(resource))
+                log.debug('Unknown event type received: %s', resource)
         else:
-            log.debug('Unknown event received over websocket: {}'.format(event))
+            log.debug('Unknown event received over websocket: %s', event)
         return
 
     def __repr__(self):

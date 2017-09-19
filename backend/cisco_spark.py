@@ -279,7 +279,7 @@ class ErrSparkBackend(ErrBot):
             log.debug('Ignoring message from self')
             return
         else:
-            message = self.get_message(event['id'])
+            message = self.get_message(event['data']['id'])
             self.callback_message(message)
         return
 
@@ -296,13 +296,13 @@ class ErrSparkBackend(ErrBot):
         ''' Event will be a dict of the webhook payload '''
         resource = event.get('resource', 'None')
         if resource == 'messages':
-            self.spark_message_callback(event['data'])
+            self.spark_message_callback(event)
         elif resource == 'memberships':
-            self.spark_memberships_callback(event['data'])
+            self.spark_memberships_callback(event)
         elif resource == 'rooms':
-            self.spark_rooms_callback(event['data'])
+            self.spark_rooms_callback(event)
         elif resource == 'teams':
-            self.spark_teams_callback(event['data'])
+            self.spark_teams_callback(event)
         else:
             log.debug('Unknown event type received: %s', resource)
 

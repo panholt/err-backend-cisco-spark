@@ -1,19 +1,23 @@
-# -*- coding: utf-8 -*-
-import json
 import logging
 import re
 
+from time import sleep
 from errbot.core import ErrBot
 from errbot.backends.base import Message, Person, Room, RoomOccupant
 from errbot.rendering import md
-import websocket
 import sparkpy
 
-# Can't use __name__ because of Yapsy
 log = logging.getLogger('errbot.backends.spark')
 
-# Constants
-NEWLINE_RE = re.compile(r'(?<!\n)\n(?!\n)')  # Single \n only, not \n\n
+
+# This incantation summons a single \n only.
+# Not multiple \n's
+# Not a \n preceeded by two spaces and a non whitespace character
+# (which would indicate "proper" markdown usage)
+#
+# Typically used as NEWLINE_RE.replace('  \n', somestring)
+# In order to fixup "soft breaks" into linebreaks that markdown understands
+NEWLINE_RE = re.compile(r'(?<!\n)(?<!\w\s{2})\n(?!\n)')
 
 
 class ErrSparkPerson(Person):
@@ -60,6 +64,8 @@ class ErrSparkPerson(Person):
 class ErrSparkRoom(Room):
     '''
     This object represents a Spark Room
+
+    args: a string of the roomId or a sparpy.models.room.SparkRoom
     '''
     def __init__(self, room):
         if isinstance(room, sparkpy.SparkRoom):
@@ -75,9 +81,6 @@ class ErrSparkRoom(Room):
     def leave(self):
         self._sparkpy_room.remove_member(self.spark.me.id)
 
-    def create(self):
-        pass
-
     def destroy(self):
         self._sparkpy_room.remove_all_members()
         self._sparkpy_room.delete()
@@ -88,10 +91,12 @@ class ErrSparkRoom(Room):
     def joined(self):
         return True
 
+    @classmethod
+    def create(cls, title, members=[], moderators=[], message=None):
+        pass
+
     @property
     def topic(self):
-        if self._sparkpy_room.type == 'direct':
-            raise ValueError('Cannot change the title of a direct room')
         return self._sparkpy_room.title
 
     @topic.setter
@@ -106,8 +111,7 @@ class ErrSparkRoom(Room):
         members = []
         for member in self._sparkpy_room.members:
             members.append('{person}:{room}'.format(person=member.personId,
-                                                    room=self._sparkpy_room.id)
-                           )
+                                                    room=self._sparkpy_room.id))
         return members
 
     def invite(self, *args):
@@ -144,8 +148,8 @@ class ErrSparkRoomOccupant(RoomOccupant, ErrSparkPerson):
 
     def __repr__(self):
         return '<SparkRoomOccupant({person}:{room})>'.format(
-            person=self.person,
-            room=self.room.id)
+                                                             person=self.person,
+                                                             room=self.room.id)
 
 
 class ErrSparkMessage(Message):
@@ -200,7 +204,6 @@ class ErrSparkBackend(ErrBot):
             raise TypeError('Invalid identifier')
 
     def send_message(self, message, files=None):
-        log.warning('send message called with {}'.format(message.__dict__))
         super().send_message(message)
         text = self.md.convert(NEWLINE_RE.sub(r'  \n', message.body))
         self.spark.send_message(text, room_id=message.to.id)
@@ -267,65 +270,53 @@ class ErrSparkBackend(ErrBot):
     def mode(self):
         return 'Spark'
 
-    def event_callback(self, event):
-        ''' Event will be a dict of the webhook payload '''
-        pass
-
-    def message_callback(self, event):
-        message = self.get_message(event['id'])
-        self.callback_message(message)
-        return
-
-    def ws_message_callback(self, ws, message):
-        try:
-            event = json.loads(message)
-        except ValueError:
-            log.error('Invalid json received from websocket: %s', event)
+    # Event callbacks for specific webhooks types
+    def spark_message_callback(self, event):
+        if event['event'] == 'deleted':
+            log.debug('Message deleted. Not processing further.')
             return
-        if event.get('url'):
-            # First event received, should be our webhook url
-            webhook_url = event.get('url').replace('12345', '8443')
-            webhook_secret = event.get('secret')
-            self.spark.create_webhook('Errbot webhook',
-                                      webhook_url,
-                                      'all', 'all',
-                                      secret=webhook_secret)
-        elif event.get('data'):
-            data = event.get('data')
-            log.debug('Received event: %s', data)
-            resource = event['data'].get('resource', 'None')
-            if resource == 'messages':
-                self.message_callback(event['data']['data'])
-            # elif resource == 'memberships':
-            #     self.spark_memberships_callback(event['data'])
-            # elif resource == 'rooms':
-            #     self.spark_rooms_callback(event['data'])
-            # elif resource == 'teams':
-            #     self.spark_teams_callback(event['data'])
-            else:
-                log.debug('Unknown event type received: %s', resource)
+        elif event['actorId'] == self.bot_identifier.id:
+            log.debug('Ignoring message from self')
+            return
         else:
-            log.debug('Unknown event received over websocket: %s', event)
+            message = self.get_message(event['id'])
+            self.callback_message(message)
         return
 
-    def __repr__(self):
-        return '<ErrSparkBackend({id})>'.format(id=self.spark.me.id)
+    def spark_rooms_callback(self, event):
+        return
+
+    def spark_teams_callback(self, event):
+        return
+
+    def spark_memberships_callback(self, event):
+        return
+
+    def spark_webhook_callback(self, event):
+        ''' Event will be a dict of the webhook payload '''
+        resource = event.get('resource', 'None')
+        if resource == 'messages':
+            self.spark_message_callback(event['data'])
+        elif resource == 'memberships':
+            self.spark_memberships_callback(event['data'])
+        elif resource == 'rooms':
+            self.spark_rooms_callback(event['data'])
+        elif resource == 'teams':
+            self.spark_teams_callback(event['data'])
+        else:
+            log.debug('Unknown event type received: %s', resource)
 
     def serve_forever(self):
         self.connect_callback()
-        # try:
-        #     while True:
-        #         sleep(1)
-        ws = websocket.WebSocketApp(self.bot_config.WEBSOCKET_PROXY,
-                                    on_message=self.ws_message_callback)
         try:
-            ws.run_forever()
+            while True:
+                sleep(1)
         except KeyboardInterrupt:
             log.debug('KeyboardInterrupt received')
             pass
         finally:
-            for hook in self.spark.webhooks.filtered(
-                    lambda x: x.name == 'Errbot webhook'):
-                hook.delete()
             self.disconnect_callback()
             self.shutdown()
+
+    def __repr__(self):
+        return '<ErrSparkBackend({id})>'.format(id=self.spark.me.id)

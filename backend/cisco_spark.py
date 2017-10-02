@@ -176,10 +176,31 @@ class ErrSparkBackend(ErrBot):
         super().__init__(config)
         self.spark = sparkpy.Spark(config.BOT_IDENTITY)
         self.md = md()  # Needed to convert from markdown extra to markdown
+        self.build_alt_prefixes()
 
     @property
     def bot_identifier(self):
         return self.spark.me
+
+    def build_alt_prefixes(self):
+        words = self.bot_identifier.displayName.split(' ')
+        new_prefixes = []
+        if len(words) > 1:
+            for x in range(len(words)):
+                new_prefixes.append(' '.join(words[:x + 1]))
+        else:
+            new_prefixes.append(self.bot_identifier.displayName)
+
+        try:
+            bot_prefixes = self.bot_config.BOT_ALT_PREFIXES.split(',')
+        except AttributeError:
+            bot_prefixes = list(self.bot_config.BOT_ALT_PREFIXES)
+
+        self.bot_alt_prefixes = tuple(new_prefixes + bot_prefixes)
+        # Errbot wont consider alt prefixes if the key doesn't exist in the config
+        if len(self.bot_config.BOT_ALT_PREFIXES) < 1:
+            self.bot_config.BOT_ALT_PREFIXES = self.bot_alt_prefixes
+        return
 
     def build_identifier(self, text_representation):
         '''

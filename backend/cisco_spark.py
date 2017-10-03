@@ -67,11 +67,11 @@ class ErrSparkRoom(Room):
 
     args: a string of the roomId or a sparpy.models.room.SparkRoom
     '''
-    def __init__(self, room):
+    def __init__(self, room, session):
         if isinstance(room, sparkpy.SparkRoom):
             self._sparkpy_room = room
         if sparkpy.utils.is_api_id(room, 'rooms'):
-            self._sparkpy_room = sparkpy.SparkRoom(room)
+            self._sparkpy_room = sparkpy.SparkRoom(room, parent=session)
         else:
             raise TypeError('Invalid Cisco Spark Room id: ' + room)
 
@@ -214,13 +214,13 @@ class ErrSparkBackend(ErrBot):
         if ':' in text_representation:
             person, room = text_representation.split(':')
             return ErrSparkRoomOccupant(ErrSparkPerson(person),
-                                        ErrSparkRoom(room))
+                                        ErrSparkRoom(room, self.spark))
 
         decoded = sparkpy.utils.decode_api_id(text_representation)
         if decoded['path'] == 'people':
             return ErrSparkPerson(text_representation)
         elif decoded['path'] == 'rooms':
-            return ErrSparkRoom(text_representation)
+            return ErrSparkRoom(text_representation, self.spark)
         else:
             raise TypeError('Invalid identifier')
 
@@ -277,11 +277,11 @@ class ErrSparkBackend(ErrBot):
         return msg.frm.person == self.bot_identifier.id
 
     def rooms(self):
-        return [ErrSparkRoom(room) for room in self.spark.rooms]
+        return [ErrSparkRoom(room, self.spark) for room in self.spark.rooms]
 
     def query_room(self, room):
         if sparkpy.utils.is_api_id(room, 'rooms'):
-            return ErrSparkRoom(room)
+            return ErrSparkRoom(room, self.spark)
         else:
             raise ValueError('Invalid roomId provided')
 

@@ -230,11 +230,11 @@ class ErrSparkBackend(ErrBot):
         self.spark.send_message(text, room_id=message.to.id)
         return
 
-    def get_message(self, message_id):
+    def get_message(self, message_id, parent):
         '''
         Take a message id, return an errbot message object
         '''
-        msg = sparkpy.SparkMessage(message_id, parent=session)
+        msg = sparkpy.SparkMessage(message_id, parent=parent)
         message = ErrSparkMessage(msg.markdown or msg.text)
         log.debug('message personId: %s', msg.personId)
         log.debug('message roomId: %s', msg.roomId)

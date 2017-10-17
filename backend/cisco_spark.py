@@ -234,7 +234,7 @@ class ErrSparkBackend(ErrBot):
         '''
         Take a message id, return an errbot message object
         '''
-        msg = sparkpy.SparkMessage(message_id)
+        msg = sparkpy.SparkMessage(message_id, parent=session)
         message = ErrSparkMessage(msg.markdown or msg.text)
         log.debug('message personId: %s', msg.personId)
         log.debug('message roomId: %s', msg.roomId)

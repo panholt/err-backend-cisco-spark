@@ -292,7 +292,7 @@ class ErrSparkBackend(ErrBot):
         return 'Spark'
 
     # Event callbacks for specific webhooks types
-    def spark_message_callback(self, event):
+    def spark_message_callback(self, event, session):
         if event['event'] == 'deleted':
             log.debug('Message deleted. Not processing further.')
             return
@@ -300,7 +300,9 @@ class ErrSparkBackend(ErrBot):
             log.debug('Ignoring message from self')
             return
         else:
-            message = self.get_message(event['data']['id'])
+            message = self.get_message(event['data']['id'],
+                                       parent=sparkpy.SparkRoom(event['data']['roomId'],
+                                                                parent=self.spark))
             self.callback_message(message)
         return
 
@@ -317,7 +319,7 @@ class ErrSparkBackend(ErrBot):
         ''' Event will be a dict of the webhook payload '''
         resource = event.get('resource', 'None')
         if resource == 'messages':
-            self.spark_message_callback(event)
+            self.spark_message_callback(event, self.spark)
         elif resource == 'memberships':
             self.spark_memberships_callback(event)
         elif resource == 'rooms':

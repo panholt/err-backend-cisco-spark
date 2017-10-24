@@ -174,7 +174,7 @@ class ErrSparkBackend(ErrBot):
 
     def __init__(self, config):
         super().__init__(config)
-        self.spark = sparkpy.Spark(config.BOT_IDENTITY)
+        self.spark = sparkpy.Spark(config.BOT_IDENTITY.get("token"))
         self.md = md()  # Needed to convert from markdown extra to markdown
         self.build_alt_prefixes()
 

@@ -26,9 +26,11 @@ class ErrSparkPerson(Person):
     sparkpy.models.people.SparkPerson
     '''
 
-    def __init__(self, person, session):
+    def __init__(self, person, session=False):
         if isinstance(person, sparkpy.SparkPerson):
             self._sparkpy_person = person
+            if not session:
+                session = person.parent
         elif sparkpy.utils.is_api_id(person, 'people'):
             self._sparkpy_person = sparkpy.SparkPerson(person, parent=session)
         else:
@@ -135,7 +137,7 @@ class ErrSparkRoomOccupant(RoomOccupant, ErrSparkPerson):
     This object represents a member in a Spark Room
     '''
     def __init__(self, person, room, membership=None):
-        super().__init__(person._sparkpy_person)
+        super().__init__(person._sparkpy_person, person.)
         self._room = room
         self.membership = membership
 

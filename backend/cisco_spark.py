@@ -26,11 +26,11 @@ class ErrSparkPerson(Person):
     sparkpy.models.people.SparkPerson
     '''
 
-    def __init__(self, person):
+    def __init__(self, person, session):
         if isinstance(person, sparkpy.SparkPerson):
             self._sparkpy_person = person
         elif sparkpy.utils.is_api_id(person, 'people'):
-            self._sparkpy_person = sparkpy.SparkPerson(person)
+            self._sparkpy_person = sparkpy.SparkPerson(person, parent=session)
         else:
             raise TypeError('Invalid Cisco Spark Person id: ' + person)
 
@@ -213,12 +213,12 @@ class ErrSparkBackend(ErrBot):
                   .format(text_representation))
         if ':' in text_representation:
             person, room = text_representation.split(':')
-            return ErrSparkRoomOccupant(ErrSparkPerson(person),
+            return ErrSparkRoomOccupant(ErrSparkPerson(person, self.spark),
                                         ErrSparkRoom(room, self.spark))
 
         decoded = sparkpy.utils.decode_api_id(text_representation)
         if decoded['path'] == 'people':
-            return ErrSparkPerson(text_representation)
+            return ErrSparkPerson(text_representation, self.spark)
         elif decoded['path'] == 'rooms':
             return ErrSparkRoom(text_representation, self.spark)
         else:

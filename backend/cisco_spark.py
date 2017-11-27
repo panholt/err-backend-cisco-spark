@@ -137,7 +137,7 @@ class ErrSparkRoomOccupant(RoomOccupant, ErrSparkPerson):
     This object represents a member in a Spark Room
     '''
     def __init__(self, person, room, membership=None):
-        super().__init__(person._sparkpy_person, person.)
+        super().__init__(person._sparkpy_person)
         self._room = room
         self.membership = membership
 
@@ -160,6 +160,13 @@ class ErrSparkMessage(Message):
 
     overrides two properties to detect if room is a group or 1:1
     '''
+    def __init__(self, *args, **kwargs):
+        self.sparkpy_msg = kwargs.pop('sparkpy_msg')
+        super().__init__(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.sparkpy_msg, attr)
+
     @property
     def is_direct(self):
         return self.frm.room.type == 'direct'
@@ -176,7 +183,7 @@ class ErrSparkBackend(ErrBot):
 
     def __init__(self, config):
         super().__init__(config)
-        self.spark = sparkpy.Spark(config.BOT_IDENTITY.get("token"))
+        self.spark = sparkpy.Spark(config.BOT_IDENTITY)
         self.md = md()  # Needed to convert from markdown extra to markdown
         self.build_alt_prefixes()
 
@@ -237,7 +244,7 @@ class ErrSparkBackend(ErrBot):
         Take a message id, return an errbot message object
         '''
         msg = sparkpy.SparkMessage(message_id, parent=parent)
-        message = ErrSparkMessage(msg.markdown or msg.text)
+        message = ErrSparkMessage(msg.markdown or msg.text, sparkpy_msg=msg)
         log.debug('message personId: %s', msg.personId)
         log.debug('message roomId: %s', msg.roomId)
         message.frm = self.build_identifier('{person}:{room}'.format(
@@ -256,18 +263,17 @@ class ErrSparkBackend(ErrBot):
         #           'yellow': 'warning',
         #           'green': 'success',
         #           'teal': 'info'}
-
         msg = '<blockquote class="{color}">'.format(color=card.color)
         msg += '<h2>{title}</h2>'.format(title=card.title)
-        msg += '{link}</br>'.format(card.link)
+        msg += '{link}</br>'.format(link=card.link)
         if card.fields:
             msg += '<ul>'
             for pair in card.fields:
                 msg += '<li><b>{key}:</b> {value}</li>'.format(key=pair[0],
                                                                value=pair[1])
             msg += '</ul>'
-        msg += '{body}</blockquote>card.body'.format(card.body)
-        self.spark.send_message(msg, room_id=card.to.id)
+        msg += '{body}</blockquote>'.format(body=card.body)
+        self.spark.send_message(msg, room_id=card.to.room.id)
 
     def build_reply(self, msg, text=None, private=False, threaded=False):
         reply = self.build_message(text)
@@ -345,3 +351,4 @@ class ErrSparkBackend(ErrBot):
 
     def __repr__(self):
         return '<ErrSparkBackend({id})>'.format(id=self.spark.me.id)
+

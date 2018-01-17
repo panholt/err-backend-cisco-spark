@@ -296,6 +296,7 @@ class ErrSparkBackend(ErrBot):
     def change_presence(self, status, message):
         raise NotImplementedError('Cannot change presence')
 
+    @property
     def mode(self):
         return 'Spark'
 
